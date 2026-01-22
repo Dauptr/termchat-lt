@@ -10,13 +10,13 @@
   "theme_color": "#00ff00",
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%23000000' width='192' height='192'/><text x='50%' y='50%' font-size='80' fill='%2300ff00' font-family='monospace' font-weight='bold' text-anchor='middle' dominant-baseline='central'>></text></svg>",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><defs><linearGradient id='grad1' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' style='stop-color:%23FF6B35;stop-opacity:1' /><stop offset='50%25' style='stop-color:%23004E89;stop-opacity:1' /><stop offset='100%25' style='stop-color:%2300D9FF;stop-opacity:1' /></linearGradient></defs><rect width='192' height='192' fill='%23000' /><circle cx='96' cy='96' r='85' fill='url(%23grad1)' opacity='0.9' /><polygon points='60,70 60,120 95,95' fill='%2300FF00' opacity='0.9' /><rect x='115' y='75' width='8' height='20' fill='%2300FFFF' rx='2' /><rect x='128' y='65' width='8' height='40' fill='%23FFD700' rx='2' /><rect x='141' y='80' width='8' height='30' fill='%23FF1493' rx='2' /><path d='M 50 130 Q 50 145 65 145 L 105 145 Q 120 145 120 130 L 120 115 Q 120 100 105 100 L 65 100 Q 50 100 50 115 Z' fill='%23FFD700' opacity='0.8' /><text x='85' y='132' font-size='16' font-weight='bold' fill='%23000' text-anchor='middle' font-family='Arial'>...</text><circle cx='150' cy='45' r='3' fill='%2300FF00' /><circle cx='150' cy='45' r='12' fill='none' stroke='%2300FFFF' stroke-width='1.5' opacity='0.6' /><circle cx='150' cy='45' r='20' fill='none' stroke='%23FF6B35' stroke-width='1.5' opacity='0.4' /></svg>",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%23000000' width='192' height='192'/><text x='50%' y='50%' font-size='80' fill='%2300ff00' font-family='monospace' font-weight='bold' text-anchor='middle' dominant-baseline='central'>></text></svg>",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><defs><linearGradient id='grad1' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' style='stop-color:%23FF6B35;stop-opacity:1' /><stop offset='50%25' style='stop-color:%23004E89;stop-opacity:1' /><stop offset='100%25' style='stop-color:%2300D9FF;stop-opacity:1' /></linearGradient></defs><rect width='192' height='192' fill='%23000' /><circle cx='96' cy='96' r='85' fill='url(%23grad1)' opacity='0.9' /><polygon points='60,70 60,120 95,95' fill='%2300FF00' opacity='0.9' /><rect x='115' y='75' width='8' height='20' fill='%2300FFFF' rx='2' /><rect x='128' y='65' width='8' height='40' fill='%23FFD700' rx='2' /><rect x='141' y='80' width='8' height='30' fill='%23FF1493' rx='2' /><path d='M 50 130 Q 50 145 65 145 L 105 145 Q 120 145 120 130 L 120 115 Q 120 100 105 100 L 65 100 Q 50 100 50 115 Z' fill='%23FFD700' opacity='0.8' /><text x='85' y='132' font-size='16' font-weight='bold' fill='%23000' text-anchor='middle' font-family='Arial'>...</text><circle cx='150' cy='45' r='3' fill='%2300FF00' /><circle cx='150' cy='45' r='12' fill='none' stroke='%2300FFFF' stroke-width='1.5' opacity='0.6' /><circle cx='150' cy='45' r='20' fill='none' stroke='%23FF6B35' stroke-width='1.5' opacity='0.4' /></svg>",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "maskable"
@@ -25,7 +25,7 @@
   "categories": ["productivity", "utilities"],
   "screenshots": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 540 720'><rect fill='%23000000' width='540' height='720'/><text x='20' y='50' font-size='16' fill='%2300ff00' font-family='monospace'>INICIALIZUOJAMA SISTEMA...</text></svg>",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 540 720'><defs><linearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' style='stop-color:%23FF6B35;stop-opacity:1' /><stop offset='100%25' style='stop-color:%2300D9FF;stop-opacity:1' /></linearGradient></defs><rect fill='%23000000' width='540' height='720'/><rect fill='url(%23grad)' width='540' height='100' opacity='0.3'/><text x='20' y='50' font-size='18' fill='%2300ff00' font-family='monospace' font-weight='bold'>TERMCHAT LT</text><text x='20' y='150' font-size='14' fill='%2300ffff' font-family='monospace'>INICIALIZUOJAMA SISTEMA...</text><text x='20' y='190' font-size='14' fill='%2300ffff' font-family='monospace'>KRAUNAMI TINKLO TVARKYKLĖS...</text><text x='20' y='230' font-size='14' fill='%23FFD700' font-family='monospace'>&lt;USR_1234&gt; LABAS!</text><text x='20' y='270' font-size='14' fill='%2300ffff' font-family='monospace'>&lt;USR_5678&gt; HI THERE!</text></svg>",
       "sizes": "540x720",
       "type": "image/svg+xml",
       "form_factor": "narrow"

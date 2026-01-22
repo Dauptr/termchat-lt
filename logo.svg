@@ -1,0 +1,39 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'>
+  <defs>
+    <linearGradient id='grad1' x1='0%' y1='0%' x2='100%' y2='100%'>
+      <stop offset='0%' style='stop-color:#FF6B35;stop-opacity:1' />
+      <stop offset='50%' style='stop-color:#004E89;stop-opacity:1' />
+      <stop offset='100%' style='stop-color:#00D9FF;stop-opacity:1' />
+    </linearGradient>
+    <linearGradient id='grad2' x1='0%' y1='0%' x2='0%' y2='100%'>
+      <stop offset='0%' style='stop-color:#00FF00;stop-opacity:1' />
+      <stop offset='100%' style='stop-color:#00FFFF;stop-opacity:1' />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width='192' height='192' fill='#000' />
+  
+  <!-- Main gradient circle -->
+  <circle cx='96' cy='96' r='85' fill='url(#grad1)' opacity='0.9' />
+  
+  <!-- Play button triangle (top left) -->
+  <polygon points='60,70 60,120 95,95' fill='#00FF00' opacity='0.9' />
+  
+  <!-- Waveform bars (right side) - dynamic effect -->
+  <rect x='115' y='75' width='8' height='20' fill='#00FFFF' rx='2' />
+  <rect x='128' y='65' width='8' height='40' fill='#FFD700' rx='2' />
+  <rect x='141' y='80' width='8' height='30' fill='#FF1493' rx='2' />
+  
+  <!-- Chat bubble (bottom) -->
+  <path d='M 50 130 Q 50 145 65 145 L 105 145 Q 120 145 120 130 L 120 115 Q 120 100 105 100 L 65 100 Q 50 100 50 115 Z' 
+        fill='#FFD700' opacity='0.8' />
+  
+  <!-- Chat text symbol -->
+  <text x='85' y='132' font-size='16' font-weight='bold' fill='#000' text-anchor='middle' font-family='Arial'>...</text>
+  
+  <!-- Radio waves (top right corner) -->
+  <circle cx='150' cy='45' r='3' fill='#00FF00' />
+  <circle cx='150' cy='45' r='12' fill='none' stroke='#00FFFF' stroke-width='1.5' opacity='0.6' />
+  <circle cx='150' cy='45' r='20' fill='none' stroke='#FF6B35' stroke-width='1.5' opacity='0.4' />
+</svg>
