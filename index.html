@@ -1,330 +1,575 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html>
+<!DOCTYPE html>
+<html lang="lt">
 <head>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <meta http-equiv="Content-Style-Type" content="text/css">
-  <title>misakaProject</title>
-  <meta name="Generator" content="Cocoa HTML Writer">
-  <meta name="CocoaVersion" content="1561.61">
-  <style type="text/css">
-    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px 'Helvetica Neue'; color: #454545}
-    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px 'Helvetica Neue'; color: #454545; min-height: 14.0px}
-    p.p3 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px 'Helvetica Neue'; color: #e4af0a}
-    span.s1 {color: #454545}
-    span.s2 {text-decoration: underline ; color: #e4af0a}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TermChat">
+    <title>TermChat LT</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#00ff00">
+
+    <!-- MQTT Library for Real-time Chat -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
+
+    <style>
+        :root {
+            --term-green: #00ff00;
+            --term-green-dark: #00cc00;
+            --term-dim: #003300;
+            --term-bg: #000000;
+            --term-glow: 0 0 5px rgba(0, 255, 0, 0.7);
+            --term-glow-strong: 0 0 15px rgba(0, 255, 0, 0.9);
+            --font-stack: 'Courier New', Courier, monospace;
+            --cyan: #00ffff;
+            --cyan-glow: 0 0 5px rgba(0, 255, 255, 0.7);
+            --error-red: #ff3333;
+            --success-green: #ccffcc;
+        }
+
+        * { 
+            box-sizing: border-box; 
+            -webkit-tap-highlight-color: transparent;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--term-bg);
+            color: var(--term-green);
+            font-family: var(--font-stack);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: background-color 0.2s;
+        }
+
+        /* Notification Flash Effect */
+        .notify-flash {
+            animation: flashGreen 0.5s ease-out;
+        }
+
+        @keyframes flashGreen {
+            0% { background-color: var(--term-bg); }
+            10% { background-color: #004400; }
+            100% { background-color: var(--term-bg); }
+        }
+
+        /* CRT Scanline Effect */
+        body::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: 
+                linear-gradient(0deg, transparent 24%, rgba(0, 0, 0, 0.15) 25%, rgba(0, 0, 0, 0.15) 26%, transparent 27%, transparent 74%, rgba(0, 0, 0, 0.15) 75%, rgba(0, 0, 0, 0.15) 76%, transparent 77%, transparent),
+                linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.03));
+            z-index: 2;
+            background-size: 100% 4px, 3px 100%;
+            pointer-events: none;
+            animation: scanlines 8s linear infinite;
+        }
+
+        @keyframes scanlines {
+            0% { background-position: 0 0, 0 0; }
+            100% { background-position: 0 4px, 0 0; }
+        }
+
+        #screen {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            padding-top: max(40px, env(safe-area-inset-top));
+            padding-bottom: 100px;
+            position: relative;
+            z-index: 1;
+            scrollbar-width: thin;
+            scrollbar-color: var(--term-dim) transparent;
+            scroll-behavior: smooth;
+        }
+
+        #screen::-webkit-scrollbar { 
+            width: 8px; 
+        }
+
+        #screen::-webkit-scrollbar-track { 
+            background: transparent; 
+        }
+
+        #screen::-webkit-scrollbar-thumb {
+            background: var(--term-dim);
+            border-radius: 4px;
+        }
+
+        .log-entry {
+            margin-bottom: 12px;
+            font-size: 14px;
+            line-height: 1.6;
+            word-wrap: break-word;
+            text-shadow: var(--term-glow);
+            font-weight: bold;
+            opacity: 0;
+            animation: fadeInText 0.3s forwards;
+            letter-spacing: 0.5px;
+        }
+
+        @keyframes fadeInText { 
+            to { opacity: 1; } 
+        }
+
+        .system-msg { 
+            color: var(--term-green);
+            border-left: 3px solid var(--term-green);
+            padding-left: 10px;
+        }
+
+        .stranger-msg { 
+            color: var(--cyan); 
+            text-shadow: var(--cyan-glow); 
+            border-left: 3px solid var(--cyan);
+            padding-left: 10px;
+        }
+
+        .error-msg { 
+            color: var(--error-red); 
+            text-shadow: 0 0 5px rgba(255, 50, 50, 0.7);
+            border-left: 3px solid var(--error-red);
+            padding-left: 10px;
+        }
+
+        .greeting-msg { 
+            color: var(--success-green); 
+            font-weight: 900;
+            text-shadow: 0 0 8px rgba(204, 255, 204, 0.5);
+            border-left: 3px solid var(--success-green);
+            padding-left: 10px;
+        }
+
+        .timestamp {
+            color: var(--term-dim);
+            margin-right: 8px;
+            font-size: 11px;
+            opacity: 0.7;
+            display: inline-block;
+        }
+
+        .cursor-block {
+            display: inline-block;
+            width: 10px;
+            height: 18px;
+            background-color: var(--term-green);
+            vertical-align: middle;
+            animation: blink 0.8s step-end infinite;
+            box-shadow: var(--term-glow);
+        }
+
+        @keyframes blink { 
+            50% { opacity: 0; } 
+        }
+
+        /* INPUT AREA */
+        #input-area {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), var(--term-bg));
+            border-top: 2px solid var(--term-green);
+            padding: 12px 15px max(10px, env(safe-area-inset-bottom));
+            display: flex;
+            align-items: center;
+            z-index: 10;
+            gap: 8px;
+            box-shadow: 0 -2px 15px rgba(0, 255, 0, 0.2);
+        }
+
+        .prompt {
+            font-size: 16px;
+            color: var(--term-green);
+            text-shadow: var(--term-glow);
+            font-weight: bold;
+            min-width: 20px;
+        }
+
+        input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid var(--term-dim);
+            color: var(--term-green);
+            font-family: var(--font-stack);
+            font-size: 14px;
+            outline: none;
+            text-shadow: var(--term-glow);
+            caret-color: var(--term-green);
+            text-transform: uppercase;
+            padding: 8px 0;
+            transition: all 0.2s;
+        }
+
+        input:focus {
+            border-bottom-color: var(--term-green);
+            box-shadow: 0 1px 5px var(--term-glow);
+        }
+
+        input::placeholder { 
+            color: var(--term-dim); 
+            text-transform: uppercase;
+            opacity: 0.5;
+        }
+
+        #listen-btn {
+            background: transparent;
+            border: 2px solid var(--term-green);
+            color: var(--term-green);
+            font-family: var(--font-stack);
+            font-size: 12px;
+            padding: 8px 14px;
+            cursor: pointer;
+            text-shadow: var(--term-glow);
+            font-weight: bold;
+            text-transform: uppercase;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            letter-spacing: 1px;
+            box-shadow: inset 0 0 10px rgba(0, 255, 0, 0.1);
+        }
+
+        #listen-btn:hover {
+            background-color: rgba(0, 255, 0, 0.1);
+            box-shadow: 0 0 15px var(--term-glow), inset 0 0 15px rgba(0, 255, 0, 0.2);
+            transform: scale(1.05);
+        }
+
+        #listen-btn:active {
+            transform: scale(0.95);
+        }
+
+        #listen-btn.playing {
+            background-color: var(--term-green);
+            color: var(--term-bg);
+            box-shadow: 0 0 20px var(--term-glow-strong), inset 0 0 20px rgba(0, 255, 0, 0.4);
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 20px var(--term-glow-strong), inset 0 0 20px rgba(0, 255, 0, 0.4); }
+            50% { box-shadow: 0 0 30px var(--term-glow-strong), inset 0 0 30px rgba(0, 255, 0, 0.6); }
+        }
+
+        /* Header Title */
+        .header-title {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to bottom, var(--term-bg), rgba(0, 0, 0, 0));
+            padding: 15px;
+            z-index: 5;
+            border-bottom: 1px solid var(--term-dim);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .title-text {
+            font-size: 14px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            text-shadow: var(--term-glow);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--term-green);
+            box-shadow: var(--term-glow);
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+
+        .status-indicator.offline {
+            background-color: var(--error-red);
+            animation: pulse-dot-error 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes pulse-dot-error {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .user-id {
+            font-size: 11px;
+            color: var(--term-dim);
+            letter-spacing: 1px;
+        }
+
+        /* Mobile specific adjustments */
+        @media (max-width: 600px) {
+            #screen {
+                padding-top: 60px;
+                padding-bottom: 120px;
+            }
+
+            .log-entry {
+                font-size: 13px;
+            }
+
+            #listen-btn {
+                font-size: 11px;
+                padding: 7px 12px;
+            }
+
+            input {
+                font-size: 13px;
+            }
+        }
+
+        @media (min-width: 800px) {
+            body { 
+                max-width: 700px; 
+                margin: 0 auto; 
+                border-left: 1px solid var(--term-dim); 
+                border-right: 1px solid var(--term-dim);
+                box-shadow: inset 0 0 50px rgba(0, 255, 0, 0.05);
+            }
+        }
+
+        /* Loading spinner */
+        .loading {
+            display: inline-block;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
-<p class="p1">&lt;!DOCTYPE html&gt;</p>
-<p class="p1">&lt;html lang="lt"&gt;</p>
-<p class="p1">&lt;head&gt;</p>
-<p class="p1">    &lt;meta charset="UTF-8"&gt;</p>
-<p class="p1">    &lt;meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"&gt;</p>
-<p class="p1">    &lt;meta name="apple-mobile-web-app-capable" content="yes"&gt;</p>
-<p class="p1">    &lt;meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"&gt;</p>
-<p class="p1">    &lt;meta name="apple-mobile-web-app-title" content="TermChat"&gt;</p>
-<p class="p1">    &lt;title&gt;TermChat LT&lt;/title&gt;</p>
-<p class="p2"><br></p>
-<p class="p1">    &lt;!-- MQTT Library for Real-time Chat --&gt;</p>
-<p class="p3"><span class="s1">    &lt;script src="<a href="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"><span class="s2">https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js</span></a>" type="text/javascript"&gt;&lt;/script&gt;</span></p>
-<p class="p2"><br></p>
-<p class="p1">    &lt;style&gt;</p>
-<p class="p1">        :root {</p>
-<p class="p1">            --term-green: #00ff00;</p>
-<p class="p1">            --term-dim: #003300;</p>
-<p class="p1">            --term-bg: #000000;</p>
-<p class="p1">            --term-glow: 0 0 5px rgba(0, 255, 0, 0.7);</p>
-<p class="p1">            --font-stack: 'Courier New', Courier, monospace;</p>
-<p class="p1">        }</p>
-<p class="p2"><br></p>
-<p class="p1">        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }</p>
-<p class="p2"><br></p>
-<p class="p1">        body {</p>
-<p class="p1">            margin: 0;</p>
-<p class="p1">            padding: 0;</p>
-<p class="p1">            background-color: var(--term-bg);</p>
-<p class="p1">            color: var(--term-green);</p>
-<p class="p1">            font-family: var(--font-stack);</p>
-<p class="p1">            height: 100vh;</p>
-<p class="p1">            overflow: hidden;</p>
-<p class="p1">            display: flex;</p>
-<p class="p1">            flex-direction: column;</p>
-<p class="p1">            transition: background-color 0.2s;</p>
-<p class="p1">        }</p>
-<p class="p2"><br></p>
-<p class="p1">        /* Notification Flash Effect */</p>
-<p class="p1">        .notify-flash {</p>
-<p class="p1">            animation: flashGreen 0.5s ease-out;</p>
-<p class="p1">        }</p>
-<p class="p2"><br></p>
-<p class="p1">        @keyframes flashGreen {</p>
-<p class="p1">            0% { background-color: var(--term-bg); }</p>
-<p class="p1">            10% { background-color: #004400; }</p>
-<p class="p1">            100% { background-color: var(--term-bg); }</p>
-<p class="p1">        }</p>
-<p class="p2"><br></p>
-<p class="p1">        /* CRT Scanline Effect */</p>
-<p class="p1">        body::before {</p>
-<p class="p1">            content: " ";</p>
-<p class="p1">            display: block;</p>
-<p class="p1">            position: absolute;</p>
-<p class="p1">            top: 0; left: 0; bottom: 0; right: 0;</p>
-<p class="p1">            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));</p>
-<p class="p1">            z-index: 2;</p>
-<p class="p1">            background-size: 100% 2px, 3px 100%;</p>
-<p class="p1">            pointer-events: none;</p>
-<p class="p1">        }</p>
-<p class="p2"><br></p>
-<p class="p1">        #screen {</p>
-<p class="p1">            flex: 1;</p>
-<p class="p1">            overflow-y: auto;</p>
-<p class="p1">            padding: 20px;</p>
-<p class="p1">            padding-top: max(40px, env(safe-area-inset-top));</p>
-<p class="p1">            padding-bottom: 80px;<span class="Apple-converted-space"> </span></p>
-<p class="p1">            position: relative;</p>
-<p class="p1">            z-index: 1;</p>
-<p class="p1">            scrollbar-width: none;<span class="Apple-converted-space"> </span></p>
-<p class="p1">        }</p>
-<p class="p2"><br></p>
-<p class="p1">        #screen::-webkit-scrollbar { display: none; }</p>
-<p class="p2"><br></p>
-<p class="p1">        .log-entry {</p>
-<p class="p1">            margin-bottom: 8px;</p>
-<p class="p1">            font-size: 16px;</p>
-<p class="p1">            line-height: 1.4;</p>
-<p class="p1">            word-wrap: break-word;</p>
-<p class="p1">            text-shadow: var(--term-glow);</p>
-<p class="p1">            font-weight: bold;</p>
-<p class="p1">            opacity: 0;</p>
-<p class="p1">            animation: fadeInText 0.1s forwards;</p>
-<p class="p1">        }</p>
-<p class="p2"><br></p>
-<p class="p1">        @keyframes fadeInText { to { opacity: 1; } }</p>
-<p class="p2"><br></p>
-<p class="p1">        .system-msg { color: var(--term-green); }</p>
-<p class="p1">        .stranger-msg { color: #00ffff; text-shadow: 0 0 5px rgba(0, 255, 255, 0.7); }</p>
-<p class="p1">        .error-msg { color: #ff3333; text-shadow: 0 0 5px rgba(255, 50, 50, 0.7); }</p>
-<p class="p1">        .greeting-msg { color: #ccffcc; font-weight: 900; }</p>
-<p class="p2"><br></p>
-<p class="p1">        .timestamp {</p>
-<p class="p1">            color: var(--term-dim);</p>
-<p class="p1">            margin-right: 8px;</p>
-<p class="p1">            font-size: 12px;</p>
-<p class="p1">            opacity: 0.7;</p>
-<p class="p1">        }</p>
-<p class="p2"><br></p>
-<p class="p1">        .cursor-block {</p>
-<p class="p1">            display: inline-block;</p>
-<p class="p1">            width: 10px;</p>
-<p class="p1">            height: 18px;</p>
-<p class="p1">            background-color: var(--term-green);</p>
-<p class="p1">            vertical-align: middle;</p>
-<p class="p1">            animation: blink 0.8s step-end infinite;</p>
-<p class="p1">        }</p>
-<p class="p1">        @keyframes blink { 50% { opacity: 0; } }</p>
-<p class="p2"><br></p>
-<p class="p1">        /* INPUT AREA */</p>
-<p class="p1">        #input-area {</p>
-<p class="p1">            position: fixed;</p>
-<p class="p1">            bottom: 0;</p>
-<p class="p1">            left: 0;</p>
-<p class="p1">            width: 100%;</p>
-<p class="p1">            background: var(--term-bg);</p>
-<p class="p1">            border-top: 1px solid var(--term-dim);</p>
-<p class="p1">            padding: 10px 15px max(10px, env(safe-area-inset-bottom));</p>
-<p class="p1">            display: flex;</p>
-<p class="p1">            align-items: center;</p>
-<p class="p1">            z-index: 10;</p>
-<p class="p1">        }</p>
-<p class="p2"><br></p>
-<p class="p1">        .prompt {</p>
-<p class="p1">            font-size: 18px;<span class="Apple-converted-space"> </span></p>
-<p class="p1">            margin-right: 10px;<span class="Apple-converted-space"> </span></p>
-<p class="p1">            text-shadow: var(--term-glow);</p>
-<p class="p1">            font-weight: bold;</p>
-<p class="p1">        }</p>
-<p class="p2"><br></p>
-<p class="p1">        input {</p>
-<p class="p1">            flex: 1;</p>
-<p class="p1">            background: transparent;</p>
-<p class="p1">            border: none;</p>
-<p class="p1">            color: var(--term-green);</p>
-<p class="p1">            font-family: var(--font-stack);</p>
-<p class="p1">            font-size: 16px;</p>
-<p class="p1">            outline: none;</p>
-<p class="p1">            text-shadow: var(--term-glow);</p>
-<p class="p1">            caret-color: var(--term-green);</p>
-<p class="p1">            text-transform: uppercase;<span class="Apple-converted-space"> </span></p>
-<p class="p1">        }</p>
-<p class="p2"><br></p>
-<p class="p1">        input::placeholder { color: #004400; text-transform: none; }</p>
-<p class="p2"><br></p>
-<p class="p1">        /* Mobile specific adjustments */</p>
-<p class="p1">        @media (min-width: 800px) {</p>
-<p class="p1">            body { max-width: 600px; margin: 0 auto; border-left: 1px solid var(--term-dim); border-right: 1px solid var(--term-dim); }</p>
-<p class="p1">        }</p>
-<p class="p1">    &lt;/style&gt;</p>
-<p class="p1">&lt;/head&gt;</p>
-<p class="p1">&lt;body&gt;</p>
-<p class="p2"><br></p>
-<p class="p1">    &lt;div id="screen"&gt;&lt;/div&gt;</p>
-<p class="p2"><br></p>
-<p class="p1">    &lt;div id="input-area"&gt;</p>
-<p class="p1">        &lt;span class="prompt"&gt;&amp;gt;&lt;/span&gt;</p>
-<p class="p1">        &lt;input type="text" id="msg-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="RAŠYKITE ŽINUTĘ..."&gt;</p>
-<p class="p1">    &lt;/div&gt;</p>
-<p class="p2"><br></p>
-<p class="p1">    &lt;script&gt;</p>
-<p class="p1">        const BROKER_HOST = "<a href="http://broker.emqx.io/"><span class="s2">broker.emqx.io</span></a>";</p>
-<p class="p1">        const BROKER_PORT = 8084;<span class="Apple-converted-space"> </span></p>
-<p class="p1">        const TOPIC = "term-chat/global/v3";</p>
-<p class="p1">        const userID = "USR_" + Math.floor(Math.random() * 10000).toString().padStart(4, '0');</p>
-<p class="p2"><br></p>
-<p class="p1">        const screen = document.getElementById('screen');</p>
-<p class="p1">        const input = document.getElementById('msg-input');</p>
-<p class="p1">        let client = null;</p>
-<p class="p2"><br></p>
-<p class="p1">        // --- TYPEWRITER EFFECT ---</p>
-<p class="p1">        function typeWriter(text, element, speed = 30) {</p>
-<p class="p1">            return new Promise(resolve =&gt; {</p>
-<p class="p1">                let i = 0;</p>
-<p class="p1">                const span = document.createElement('span');</p>
-<p class="p1">                element.appendChild(span);</p>
-<p class="p1">                const cursor = document.createElement('span');</p>
-<p class="p1">                cursor.className = 'cursor-block';</p>
-<p class="p1">                element.appendChild(cursor);</p>
-<p class="p2"><br></p>
-<p class="p1">                function type() {</p>
-<p class="p1">                    if (i &lt; text.length) {</p>
-<p class="p1">                        span.textContent += text.charAt(i);</p>
-<p class="p1">                        i++;</p>
-<p class="p1">                        screen.scrollTop = screen.scrollHeight;</p>
-<p class="p1">                        setTimeout(type, speed);</p>
-<p class="p1">                    } else {</p>
-<p class="p1">                        cursor.style.display = 'none';</p>
-<p class="p1">                        resolve();</p>
-<p class="p1">                    }</p>
-<p class="p1">                }</p>
-<p class="p1">                type();</p>
-<p class="p1">            });</p>
-<p class="p1">        }</p>
-<p class="p2"><br></p>
-<p class="p1">        // --- VISUAL NOTIFICATION (FLASH) ---</p>
-<p class="p1">        function flashNotification() {</p>
-<p class="p1">            document.body.classList.remove('notify-flash');</p>
-<p class="p1">            void document.body.offsetWidth; // trigger reflow</p>
-<p class="p1">            document.body.classList.add('notify-flash');</p>
-<p class="p1">        }</p>
-<p class="p2"><br></p>
-<p class="p1">        // --- MAIN BOOT SEQUENCE ---</p>
-<p class="p1">        async function bootSystem() {</p>
-<p class="p1">            const div = document.createElement('div');</p>
-<p class="p1">            div.className = 'log-entry system-msg';</p>
-<p class="p1">            screen.appendChild(div);</p>
-<p class="p2"><br></p>
-<p class="p1">            // Lithuanian Boot Messages</p>
-<p class="p1">            await typeWriter("INICIALIZUOJAMA SISTEMA...", div);</p>
-<p class="p1">            await typeWriter("KRAUNAMI TINKLO TVARKYKLĖS...", div);</p>
-<p class="p1">            await typeWriter("JUNGIAMASI PRIE SERVERIO...", div);</p>
-<p class="p1">            initMQTT();</p>
-<p class="p1">        }</p>
-<p class="p2"><br></p>
-<p class="p1">        // --- MQTT LOGIC ---</p>
-<p class="p1">        function initMQTT() {</p>
-<p class="p1">            client = new Paho.MQTT.Client(BROKER_HOST, BROKER_PORT, "web_" + parseInt(Math.random() * 100000, 10));</p>
-<p class="p1">            client.onConnectionLost = onConnectionLost;</p>
-<p class="p1">            client.onMessageArrived = onMessageArrived;</p>
-<p class="p1">            client.connect({ onSuccess: onConnect, useSSL: true, onFailure: onFailure });</p>
-<p class="p1">        }</p>
-<p class="p2"><br></p>
-<p class="p1">        function onConnect() {</p>
-<p class="p1">            log("SISTEMA PRIJUNGTA.", 'system-msg');</p>
-<p class="p1">            log(`NAUDOTOJAS: ${userID}`, 'system-msg');</p>
-<p class="p1">            client.subscribe(TOPIC);</p>
-<p class="p1">            input.focus();</p>
-<p class="p2"><br></p>
-<p class="p1">            // Announce Join</p>
-<p class="p1">            const announceMsg = new Paho.MQTT.Message(JSON.stringify({ type: 'join', id: userID }));</p>
-<p class="p1">            announceMsg.destinationName = TOPIC;</p>
-<p class="p1">            client.send(announceMsg);</p>
-<p class="p1">        }</p>
-<p class="p2"><br></p>
-<p class="p1">        function onFailure(responseObject) {</p>
-<p class="p1">            log("KLAIDA: " + responseObject.errorMessage, 'error-msg');</p>
-<p class="p1">            setTimeout(initMQTT, 3000);</p>
-<p class="p1">        }</p>
-<p class="p2"><br></p>
-<p class="p1">        function onConnectionLost(responseObject) {</p>
-<p class="p1">            if (responseObject.errorCode !== 0) {</p>
-<p class="p1">                log("RYŠYS PRARASTAS. BANDOM IŠ NAUJO...", 'error-msg');</p>
-<p class="p1">                setTimeout(initMQTT, 3000);</p>
-<p class="p1">            }</p>
-<p class="p1">        }</p>
-<p class="p2"><br></p>
-<p class="p1">        function onMessageArrived(message) {</p>
-<p class="p1">            try {</p>
-<p class="p1">                const payload = JSON.parse(message.payloadString);</p>
-<p class="p1">                if (<a href="http://payload.id/"><span class="s2">payload.id</span></a> === userID) return;</p>
-<p class="p2"><br></p>
-<p class="p1">                if (payload.type === 'join') {</p>
-<p class="p1">                    // NOTIFICATION &amp; GREETING LOGIC</p>
-<p class="p1">                    flashNotification();<span class="Apple-converted-space"> </span></p>
-<p class="p1">                    log(`NAUJAS NAUDOTOJAS: ${<a href="http://payload.id/"><span class="s2">payload.id</span></a>}`, 'system-msg');</p>
-<p class="p2"><br></p>
-<p class="p1">                    // Automated Greeting Sequence</p>
-<p class="p1">                    setTimeout(() =&gt; {</p>
-<p class="p1">                        log(`SISTEMA: SIUNČIAMAS PASISVEIKINIMAS...`, 'system-msg');</p>
-<p class="p1">                    }, 500);</p>
-<p class="p2"><br></p>
-<p class="p1">                    setTimeout(() =&gt; {</p>
-<p class="p1">                        // Lithuanian Greetings</p>
-<p class="p1">                        log(`PASISVEIKINIMAS: LABAS / HI / HELLO`, 'greeting-msg');</p>
-<p class="p1">                        log(`UŽKLAUSA: PASIKALBAM? PAŠNEKĖKIM?`, 'greeting-msg');</p>
-<p class="p2"><br></p>
-<p class="p1">                        // Helper: Auto-fill "LABAS!" in Lithuanian</p>
-<p class="p1">                        input.value = "LABAS!";</p>
-<p class="p1">                    }, 1200);</p>
-<p class="p2"><br></p>
-<p class="p1">                } else if (payload.type === 'chat') {</p>
-<p class="p1">                    log(`&amp;lt;${<a href="http://payload.id/"><span class="s2">payload.id</span></a>}&amp;gt; ${payload.msg}`, 'stranger-msg');</p>
-<p class="p1">                }</p>
-<p class="p1">            } catch (e) { console.error(e); }</p>
-<p class="p1">        }</p>
-<p class="p2"><br></p>
-<p class="p1">        function log(text, type = 'user-msg') {</p>
-<p class="p1">            const div = document.createElement('div');</p>
-<p class="p1">            div.className = `log-entry ${type}`;</p>
-<p class="p1">            const now = new Date();</p>
-<p class="p1">            const time = now.getHours().toString().padStart(2,'0') + ":" + now.getMinutes().toString().padStart(2,'0');</p>
-<p class="p2"><br></p>
-<p class="p1">            if (type === 'system-msg' || type === 'error-msg') {</p>
-<p class="p1">                div.innerText = `[${time}] ${text}`;</p>
-<p class="p1">            } else {</p>
-<p class="p1">                div.innerHTML = `&lt;span class="timestamp"&gt;[${time}]&lt;/span&gt; ${text}`;</p>
-<p class="p1">            }</p>
-<p class="p1">            screen.appendChild(div);</p>
-<p class="p1">            screen.scrollTop = screen.scrollHeight;</p>
-<p class="p1">        }</p>
-<p class="p2"><br></p>
-<p class="p1">        function sendMessage() {</p>
-<p class="p1">            const text = input.value.trim();</p>
-<p class="p1">            if (text &amp;&amp; client &amp;&amp; client.isConnected()) {</p>
-<p class="p1">                log(`&amp;lt;${userID}&amp;gt; ${text}`, 'system-msg');</p>
-<p class="p1">                const message = new Paho.MQTT.Message(JSON.stringify({ type: 'chat', id: userID, msg: text }));</p>
-<p class="p1">                message.destinationName = TOPIC;</p>
-<p class="p1">                client.send(message);</p>
-<p class="p1">                input.value = '';</p>
-<p class="p1">            }</p>
-<p class="p1">        }</p>
-<p class="p2"><br></p>
-<p class="p1">        input.addEventListener('keypress', function (e) {</p>
-<p class="p1">            if (e.key === 'Enter') sendMessage();</p>
-<p class="p1">        });</p>
-<p class="p2"><br></p>
-<p class="p1">        window.onload = bootSystem;</p>
-<p class="p2"><br></p>
-<p class="p1">    &lt;/script&gt;</p>
-<p class="p1">&lt;/body&gt;</p>
-<p class="p1">&lt;/html&gt;</p>
+
+    <div class="header-title">
+        <div class="title-text">
+            <span class="status-indicator" id="status-dot"></span>
+            TERMCHAT LT
+        </div>
+        <div class="user-id" id="user-display"></div>
+    </div>
+
+    <div id="screen"></div>
+
+    <div id="input-area">
+        <span class="prompt">></span>
+        <input type="text" id="msg-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="RAŠYKITE ŽINUTĘ...">
+        <button id="listen-btn">LISTEN</button>
+    </div>
+
+    <audio id="radio-player"></audio>
+
+    <script>
+        const BROKER_HOST = "broker.emqx.io";
+        const BROKER_PORT = 8084;
+        const TOPIC = "term-chat/global/v3";
+        const userID = "USR_" + Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+
+        const screen = document.getElementById('screen');
+        const input = document.getElementById('msg-input');
+        const listenBtn = document.getElementById('listen-btn');
+        const radioPlayer = document.getElementById('radio-player');
+        const statusDot = document.getElementById('status-dot');
+        const userDisplay = document.getElementById('user-display');
+        let client = null;
+
+        // Radio streaming URL (online radio)
+        const RADIO_STREAM = "https://uk7.internet-radio.com:8000";
+        let isPlaying = false;
+
+        // --- TYPEWRITER EFFECT ---
+        function typeWriter(text, element, speed = 30) {
+            return new Promise(resolve => {
+                let i = 0;
+                const span = document.createElement('span');
+                element.appendChild(span);
+                const cursor = document.createElement('span');
+                cursor.className = 'cursor-block';
+                element.appendChild(cursor);
+
+                function type() {
+                    if (i < text.length) {
+                        span.textContent += text.charAt(i);
+                        i++;
+                        screen.scrollTop = screen.scrollHeight;
+                        setTimeout(type, speed);
+                    } else {
+                        cursor.style.display = 'none';
+                        resolve();
+                    }
+                }
+                type();
+            });
+        }
+
+        // --- VISUAL NOTIFICATION (FLASH) ---
+        function flashNotification() {
+            document.body.classList.remove('notify-flash');
+            void document.body.offsetWidth; // trigger reflow
+            document.body.classList.add('notify-flash');
+        }
+
+        // --- MAIN BOOT SEQUENCE ---
+        async function bootSystem() {
+            userDisplay.textContent = userID;
+            
+            const div = document.createElement('div');
+            div.className = 'log-entry system-msg';
+            screen.appendChild(div);
+
+            // Lithuanian Boot Messages
+            await typeWriter("INICIALIZUOJAMA SISTEMA...", div);
+            await typeWriter("KRAUNAMI TINKLO TVARKYKLĖS...", div);
+            await typeWriter("JUNGIAMASI PRIE SERVERIO...", div);
+            initMQTT();
+        }
+
+        // --- MQTT LOGIC ---
+        function initMQTT() {
+            client = new Paho.MQTT.Client(BROKER_HOST, BROKER_PORT, "web_" + parseInt(Math.random() * 100000, 10));
+            client.onConnectionLost = onConnectionLost;
+            client.onMessageArrived = onMessageArrived;
+            client.connect({ onSuccess: onConnect, useSSL: true, onFailure: onFailure });
+        }
+
+        function onConnect() {
+            log("SISTEMA PRIJUNGTA.", 'system-msg');
+            log(`NAUDOTOJAS: ${userID}`, 'system-msg');
+            statusDot.classList.remove('offline');
+            client.subscribe(TOPIC);
+            input.focus();
+
+            // Announce Join
+            const announceMsg = new Paho.MQTT.Message(JSON.stringify({ type: 'join', id: userID }));
+            announceMsg.destinationName = TOPIC;
+            client.send(announceMsg);
+        }
+
+        function onFailure(responseObject) {
+            log("KLAIDA: " + responseObject.errorMessage, 'error-msg');
+            setTimeout(initMQTT, 3000);
+        }
+
+        function onConnectionLost(responseObject) {
+            if (responseObject.errorCode !== 0) {
+                log("RYŠYS PRARASTAS. BANDOM IŠ NAUJO...", 'error-msg');
+                statusDot.classList.add('offline');
+                setTimeout(initMQTT, 3000);
+            }
+        }
+
+        function onMessageArrived(message) {
+            try {
+                const payload = JSON.parse(message.payloadString);
+                if (payload.id === userID) return;
+
+                if (payload.type === 'join') {
+                    // NOTIFICATION & GREETING LOGIC
+                    flashNotification();
+                    log(`NAUJAS NAUDOTOJAS: ${payload.id}`, 'system-msg');
+
+                    // Automated Greeting Sequence
+                    setTimeout(() => {
+                        log(`SISTEMA: SIUNČIAMAS PASISVEIKINIMAS...`, 'system-msg');
+                    }, 500);
+
+                    setTimeout(() => {
+                        // Lithuanian Greetings
+                        log(`PASISVEIKINIMAS: LABAS / HI / HELLO`, 'greeting-msg');
+                        log(`UŽKLAUSA: PASIKALBAM? PAŠNEKĖKIM?`, 'greeting-msg');
+
+                        // Helper: Auto-fill "LABAS!" in Lithuanian
+                        input.value = "LABAS!";
+                    }, 1200);
+
+                } else if (payload.type === 'chat') {
+                    log(`<${payload.id}> ${payload.msg}`, 'stranger-msg');
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function log(text, type = 'user-msg') {
+            const div = document.createElement('div');
+            div.className = `log-entry ${type}`;
+            const now = new Date();
+            const time = now.getHours().toString().padStart(2,'0') + ":" + now.getMinutes().toString().padStart(2,'0');
+
+            if (type === 'system-msg' || type === 'error-msg') {
+                div.innerText = `[${time}] ${text}`;
+            } else {
+                div.innerHTML = `<span class="timestamp">[${time}]</span> ${text}`;
+            }
+            screen.appendChild(div);
+            screen.scrollTop = screen.scrollHeight;
+        }
+
+        function sendMessage() {
+            const text = input.value.trim();
+            if (text && client && client.isConnected()) {
+                log(`<${userID}> ${text}`, 'system-msg');
+                const message = new Paho.MQTT.Message(JSON.stringify({ type: 'chat', id: userID, msg: text }));
+                message.destinationName = TOPIC;
+                client.send(message);
+                input.value = '';
+            }
+        }
+
+        input.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        // --- RADIO LISTENER ---
+        listenBtn.addEventListener('click', function () {
+            if (isPlaying) {
+                radioPlayer.pause();
+                listenBtn.classList.remove('playing');
+                listenBtn.textContent = 'LISTEN';
+                isPlaying = false;
+            } else {
+                radioPlayer.src = RADIO_STREAM;
+                radioPlayer.play().catch(err => {
+                    log("RADIJO SRAUTAS NEPASIEKIAMAS", 'error-msg');
+                    console.error('Radio playback error:', err);
+                });
+                listenBtn.classList.add('playing');
+                listenBtn.textContent = 'STOP';
+                isPlaying = true;
+            }
+        });
+
+        window.onload = bootSystem;
+
+        // --- PWA SERVICE WORKER REGISTRATION ---
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js')
+                .then(registration => {
+                    console.log('Service Worker registered successfully:', registration);
+                })
+                .catch(error => {
+                    console.error('Service Worker registration failed:', error);
+                });
+        }
+
+    </script>
 </body>
 </html>
