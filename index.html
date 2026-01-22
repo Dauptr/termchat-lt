@@ -394,7 +394,7 @@
         let client = null;
 
         // Radio streaming URL (online radio)
-        const RADIO_STREAM = "http://player.internet-radio.com/?server=uk7.internet-radio.com:8000";
+        const RADIO_STREAM = "http://uk7.internet-radio.com:8000/";
         let isPlaying = false;
 
         // --- TYPEWRITER EFFECT ---
@@ -545,15 +545,30 @@
                 listenBtn.classList.remove('playing');
                 listenBtn.textContent = 'LISTEN';
                 isPlaying = false;
+                log("RADIJO SRAUTAS SUSTABDYTAS", 'system-msg');
             } else {
                 radioPlayer.src = RADIO_STREAM;
-                radioPlayer.play().catch(err => {
+                radioPlayer.crossOrigin = "anonymous";
+                
+                const playPromise = radioPlayer.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise
+                        .then(() => {
+                            listenBtn.classList.add('playing');
+                            listenBtn.textContent = 'STOP';
+                            isPlaying = true;
+                            log("RADIJO SRAUTAS PRADĖTAS", 'system-msg');
+                        })
+                        .catch(err => {
+                            log("RADIJO SRAUTAS NEPASIEKIAMAS - TIKRINKITE RYŠĮ", 'error-msg');
+                            console.error('Radio playback error:', err);
+                            isPlaying = false;
+                        });
+                } else {
                     log("RADIJO SRAUTAS NEPASIEKIAMAS", 'error-msg');
-                    console.error('Radio playback error:', err);
-                });
-                listenBtn.classList.add('playing');
-                listenBtn.textContent = 'STOP';
-                isPlaying = true;
+                    isPlaying = false;
+                }
             }
         });
 
