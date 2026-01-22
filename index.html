@@ -515,7 +515,7 @@
 
     <div id="media-player-container">
         <div class="media-info">
-            🎙️ <span id="station-name">LIVE - movedahouse.com</span> (UK7)
+            🎙️ <span id="station-name">📻 PUBLIC RADIO</span>
         </div>
         <div class="media-controls">
             <button class="media-button" id="play-btn">▶ PLAY</button>
@@ -543,20 +543,20 @@
         const bgPhoto = document.getElementById('bg-photo');
         let client = null;
 
-        // Radio streaming URLs - Focus on proxy endpoint that works with browser
+        // Radio streaming URLs - Working public radio streams
         const RADIO_STREAMS = [
-            // Official proxy endpoint from movedahouse.com (HTTPS) - PRIMARY
-            "https://uk7.internet-radio.com/proxy/movedahouse?mp=/stream;",
-            "http://uk7.internet-radio.com/proxy/movedahouse?mp=/stream;",
-            // Direct MP3 stream attempts (no playlist formats)
-            "http://uk7.internet-radio.com:8000/stream.mp3",
-            "http://uk7.internet-radio.com:8000/",
-            "http://uk7.internet-radio.com:8000",
-            // Cache-busting variant
-            "http://uk7.internet-radio.com:8000/?t=" + Date.now()
+            // SomaFM streams (proven to work with HTML5 audio)
+            "https://ice1.somafm.com/secretagent-128-mp3",
+            "https://ice1.somafm.com/groovesalad-128-mp3",
+            "https://ice1.somafm.com/missioncontrol-128-mp3",
+            // BBC Radio streams (public broadcasting, CORS enabled)
+            "https://a.files.bbci.co.uk/media/live/manifesto/audio/simulcast/hls_variant/default/open_access/sbr_low/bbc_radio_one.m3u8",
+            // Fallback: Direct MP3 alternatives
+            "https://stream.live.vc.bbcmedia.co.uk/bbc_radio_fourfm",
+            "http://stream.radiotunes.com:80/ambient?listening_TOKEN=149827e0_01761c93-2a10a45c_135802_2"
         ];
         let currentStreamIndex = 0;
-        const RADIO_STATION_NAME = "LIVE - movedahouse.com";
+        const RADIO_STATION_NAME = "📻 PUBLIC RADIO";
 
         // Media player elements
         const mediaContainer = document.getElementById('media-player-container');
