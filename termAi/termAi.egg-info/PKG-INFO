@@ -1,9 +1,0 @@
-Metadata-Version: 2.4
-Name: termAi
-Version: 0.1.0
-Summary: A custom AI library built from scratch.
-Author: Your Name
-Requires-Dist: numpy
-Dynamic: author
-Dynamic: requires-dist
-Dynamic: summary
