@@ -3,6 +3,8 @@ import json
 import os
 from dotenv import load_dotenv
 from backend import get_ai_response
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # Load Config
 load_dotenv()
@@ -10,22 +12,37 @@ MQTT_BROKER = os.getenv("MQTT_BROKER", "broker.emqx.io")
 MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
 MQTT_TOPIC = "term-chat/global/v3"
 AI_USER_ID = os.getenv("AI_USER_ID", "TERMAI")
+PORT = int(os.getenv("PORT", 10000))
 
 # Debug logging
 print(f"🔧 DEBUG: MQTT_BROKER={MQTT_BROKER}")
 print(f"🔧 DEBUG: MQTT_PORT={MQTT_PORT}")
 print(f"🔧 DEBUG: AI_USER_ID={AI_USER_ID}")
+print(f"🔧 DEBUG: PORT={PORT}")
 print(f"🔧 DEBUG: OPENAI_API_KEY={'SET' if os.getenv('OPENAI_API_KEY') else 'NOT SET'}")
 
-# Keep service alive for Render
-import time
-import threading
+# HTTP Server for Render health check
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+        status = {
+            "status": "running",
+            "service": "TermChat MQTT AI Bot",
+            "ai_user_id": AI_USER_ID,
+            "mqtt_broker": MQTT_BROKER
+        }
+        self.wfile.write(json.dumps(status).encode())
+    
+    def log_message(self, format, *args):
+        pass  # Suppress HTTP logs
 
-def keep_alive():
-    """Keep the service running for cloud deployment"""
-    while True:
-        time.sleep(30)
-        print("🔄 Service alive...")
+def start_http_server():
+    """Start HTTP server for Render port binding"""
+    server = HTTPServer(('0.0.0.0', PORT), HealthHandler)
+    print(f"🌐 HTTP server started on port {PORT}")
+    server.serve_forever()
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
@@ -47,7 +64,6 @@ def on_connect(client, userdata, flags, rc):
 def on_message(client, userdata, msg):
     try:
         payload = json.loads(msg.payload.decode())
-        print(f"📨 Received message: {payload}")
         
         # Only respond to chat messages, not AI's own messages
         if payload.get("type") == "chat" and payload.get("id") != AI_USER_ID:
@@ -75,31 +91,27 @@ def on_message(client, userdata, msg):
         
     except Exception as e:
         print(f"❌ Error processing message: {e}")
-        import traceback
-        traceback.print_exc()
 
-def on_disconnect(client, userdata, rc):
-    print(f"⚠️ Disconnected from MQTT Broker. Code: {rc}")
-
-# Start the Service
-client = mqtt.Client()
-client.on_connect = on_connect
-client.on_message = on_message
-client.on_disconnect = on_disconnect
-
-print("🚀 Starting TermChat MQTT AI Service...")
-print(f"🔗 Connecting to {MQTT_BROKER}:{MQTT_PORT}")
-print(f"🤖 AI User ID: {AI_USER_ID}")
-
-try:
-    # Start keep-alive thread for cloud deployment
-    keep_alive_thread = threading.Thread(target=keep_alive, daemon=True)
-    keep_alive_thread.start()
+def start_mqtt_client():
+    """Start MQTT client in separate thread"""
+    # Fix deprecation warning
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
+    client.on_connect = on_connect
+    client.on_message = on_message
     
-    client.connect(MQTT_BROKER, MQTT_PORT, 60)
-    print("🔄 Starting MQTT loop...")
-    client.loop_forever()
-except Exception as e:
-    print(f"💥 Fatal error: {e}")
-    import traceback
-    traceback.print_exc()
+    print(f"🚀 Starting MQTT connection to {MQTT_BROKER}:{MQTT_PORT}")
+    try:
+        client.connect(MQTT_BROKER, MQTT_PORT, 60)
+        client.loop_forever()
+    except Exception as e:
+        print(f"💥 MQTT connection failed: {e}")
+
+if __name__ == "__main__":
+    print("🚀 Starting TermChat MQTT AI Service...")
+    
+    # Start MQTT client in background thread
+    mqtt_thread = threading.Thread(target=start_mqtt_client, daemon=True)
+    mqtt_thread.start()
+    
+    # Start HTTP server (blocks main thread)
+    start_http_server()
