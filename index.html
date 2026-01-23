@@ -569,8 +569,15 @@
         const bgPhoto = document.getElementById('bg-photo');
         let client = null;
 
-        // Radio streaming URL using playlist generator
-        const RADIO_STREAM_URL = "http://uk4.internet-radio.com:8049/";
+        // Radio streaming URLs with fallbacks
+        const RADIO_STREAMS = [
+            "https://ice1.somafm.com/groovesalad-256-mp3",
+            "https://stream.live.vc.bbcmedia.co.uk/bbc_radio_one",
+            "https://ice2.somafm.com/dronezone-256-mp3",
+            "https://ice4.somafm.com/lush-128-mp3",
+            "https://streams.ilovemusic.de/iloveradio1.mp3"
+        ];
+        let currentStreamIndex = 0;
         let isPlaying = false;
 
         // Avatar and Photo Gallery
@@ -831,33 +838,53 @@
                 isPlaying = false;
                 log("RADIJO SRAUTAS SUSTABDYTAS ⏹", 'system-msg');
             } else {
-                listenBtn.textContent = 'CONNECTING...';
-                listenBtn.disabled = true;
-                
-                radioPlayer.src = RADIO_STREAM_URL;
-                radioPlayer.crossOrigin = "anonymous";
-                
-                const playPromise = radioPlayer.play();
-                
-                if (playPromise !== undefined) {
-                    playPromise
-                        .then(() => {
-                            listenBtn.classList.add('playing');
-                            listenBtn.textContent = 'STOP ⏸';
-                            listenBtn.disabled = false;
-                            isPlaying = true;
-                            log("RADIJAS GROJA ♫ UK RADIO STREAM", 'greeting-msg');
-                        })
-                        .catch(err => {
-                            log("RADIJO KLAIDA: " + err.name + " (" + err.code + ")", 'error-msg');
-                            listenBtn.textContent = 'LISTEN';
-                            listenBtn.disabled = false;
-                            isPlaying = false;
-                            console.error('Radio playback error:', err);
-                        });
-                }
+                tryNextRadioStream();
             }
         });
+
+        function tryNextRadioStream() {
+            if (currentStreamIndex >= RADIO_STREAMS.length) {
+                log("VISI RADIJO SRAUTAI NEPASIEKIAMI", 'error-msg');
+                listenBtn.textContent = 'LISTEN';
+                listenBtn.disabled = false;
+                return;
+            }
+
+            listenBtn.textContent = 'CONNECTING...';
+            listenBtn.disabled = true;
+            
+            const streamUrl = RADIO_STREAMS[currentStreamIndex];
+            radioPlayer.src = streamUrl;
+            radioPlayer.crossOrigin = "anonymous";
+            
+            const playPromise = radioPlayer.play();
+            
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => {
+                        listenBtn.classList.add('playing');
+                        listenBtn.textContent = 'STOP ⏸';
+                        listenBtn.disabled = false;
+                        isPlaying = true;
+                        const streamName = getStreamName(streamUrl);
+                        log(`RADIJAS GROJA ♫ ${streamName}`, 'greeting-msg');
+                    })
+                    .catch(err => {
+                        console.error('Radio stream failed:', streamUrl, err);
+                        currentStreamIndex++;
+                        setTimeout(tryNextRadioStream, 1000);
+                    });
+            }
+        }
+
+        function getStreamName(url) {
+            if (url.includes('somafm.com/groovesalad')) return 'SOMA FM - GROOVE SALAD';
+            if (url.includes('bbc')) return 'BBC RADIO ONE';
+            if (url.includes('dronezone')) return 'SOMA FM - DRONE ZONE';
+            if (url.includes('lush')) return 'SOMA FM - LUSH';
+            if (url.includes('iloveradio')) return 'I LOVE RADIO';
+            return 'INTERNET RADIO';
+        }
 
         radioPlayer.addEventListener('error', (e) => {
             const errorCodes = {
@@ -869,12 +896,13 @@
             const errorCode = radioPlayer.error ? radioPlayer.error.code : 'unknown';
             const errorName = errorCodes[errorCode] || 'Unknown Error';
             
-            log("RADIJO KLAIDA: " + errorName, 'error-msg');
-            listenBtn.classList.remove('playing');
-            listenBtn.textContent = 'LISTEN';
-            listenBtn.disabled = false;
-            isPlaying = false;
             console.error('Radio error:', errorName);
+            
+            // Try next stream on error
+            if (isPlaying || listenBtn.disabled) {
+                currentStreamIndex++;
+                setTimeout(tryNextRadioStream, 1000);
+            }
         });
 
         // --- AVATAR AND PHOTO GALLERY ---
