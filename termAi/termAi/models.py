@@ -2,6 +2,18 @@ import numpy as np
 import random
 from .core import Tensor, Softmax
 
+class Linear:
+    def __init__(self, in_features, out_features):
+        self.weights = Tensor(np.random.randn(in_features, out_features) * 0.1)
+        self.bias = Tensor(np.zeros(out_features))
+
+    def __call__(self, x):
+        # x * weights + bias
+        return Tensor(np.dot(x.data, self.weights.data) + self.bias.data)
+    
+    def parameters(self):
+        return [self.weights, self.bias]
+
 class Embedding:
     def __init__(self, vocab_size, embed_size):
         self.weights = Tensor(np.random.randn(vocab_size, embed_size) * 0.1)
@@ -9,23 +21,6 @@ class Embedding:
     def __call__(self, x):
         # Simple lookup - in practice this would be more sophisticated
         return Tensor(self.weights.data[x] if isinstance(x, int) else self.weights.data)
-
-class MiniGPT:
-    def __init__(self, vocab_size, embed_size, num_layers):
-        self.embedding = Embedding(vocab_size, embed_size)
-        # STACK THE BLOCKS - This is "Scaling"
-        self.blocks = [TransformerBlock(embed_size) for _ in range(num_layers)]
-        self.head = Linear(embed_size, vocab_size) # Output layer
-
-    def __call__(self, x):
-        x = self.embedding(x)
-        
-        # Pass data through every layer in the stack
-        for block in self.blocks:
-            x = block(x)
-            
-        logits = self.head(x)
-        return logits
 
 class SelfAttention:
     def __init__(self, embed_size):
@@ -74,6 +69,23 @@ class TransformerBlock:
         # Note: Simplified element-wise addition
         return Tensor(attended.data + x.data)
 
+class MiniGPT:
+    def __init__(self, vocab_size, embed_size, num_layers):
+        self.embedding = Embedding(vocab_size, embed_size)
+        # STACK THE BLOCKS - This is "Scaling"
+        self.blocks = [TransformerBlock(embed_size) for _ in range(num_layers)]
+        self.head = Linear(embed_size, vocab_size) # Output layer
+
+    def __call__(self, x):
+        x = self.embedding(x)
+        
+        # Pass data through every layer in the stack
+        for block in self.blocks:
+            x = block(x)
+            
+        logits = self.head(x)
+        return logits
+
 class SimpleChatBot:
     def __init__(self, vocab_size=10):
         self.vocab_size = vocab_size
@@ -112,16 +124,3 @@ class SimpleChatBot:
         ]
         
         return responses[predicted_id]
-
-# Keep your existing Linear class
-class Linear:
-    def __init__(self, in_features, out_features):
-        self.weights = Tensor(np.random.randn(in_features, out_features) * 0.1)
-        self.bias = Tensor(np.zeros(out_features))
-
-    def __call__(self, x):
-        # x * weights + bias
-        return Tensor(np.dot(x.data, self.weights.data) + self.bias.data)
-    
-    def parameters(self):
-        return [self.weights, self.bias]

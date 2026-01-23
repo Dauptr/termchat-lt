@@ -1,24 +1,22 @@
 import openai
+import os
 from termAi.models import SimpleChatBot
 from termAi.data_collector import ChatLogger
-
-# Configuration for the API
-client = openai.OpenAI(
-    api_key="YOUR_API_KEY",  # Replace with your actual key
-    base_url="https://api.openai.com/v1"
-)
 
 # Initialize local AI and logger
 local_bot = SimpleChatBot()
 logger = ChatLogger()
 
-def get_ai_response(user_message, use_api=True):
+def get_ai_response(user_message, use_api=False):
     try:
-        if use_api:
+        if use_api and os.getenv("OPENAI_API_KEY"):
+            client = openai.OpenAI(
+                api_key=os.getenv("OPENAI_API_KEY")
+            )
             response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": "You are TermAi, a helpful assistant in TermChat LT."},
+                    {"role": "system", "content": "You are TermAi, a helpful assistant in TermChat LT. Respond in Lithuanian when possible."},
                     {"role": "user", "content": user_message}
                 ]
             )
@@ -32,4 +30,7 @@ def get_ai_response(user_message, use_api=True):
         return ai_response
         
     except Exception as e:
-        return f"Error: {str(e)}"
+        # Fallback to local AI on any error
+        ai_response = local_bot.think(user_message)
+        logger.log_interaction(user_message, ai_response)
+        return ai_response
