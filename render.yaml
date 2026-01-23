@@ -1,0 +1,14 @@
+version: 1
+services:
+  - type: web
+    name: termchat-mqtt-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python mqtt_service.py
+    envVars:
+      - key: MQTT_BROKER
+        value: broker.emqx.io
+      - key: MQTT_PORT
+        value: 1883
+      - key: AI_USER_ID
+        value: TERMAI

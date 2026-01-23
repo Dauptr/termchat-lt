@@ -9,7 +9,17 @@ load_dotenv()
 MQTT_BROKER = os.getenv("MQTT_BROKER", "broker.emqx.io")
 MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
 MQTT_TOPIC = "term-chat/global/v3"
-AI_USER_ID = "TERMAI"
+AI_USER_ID = os.getenv("AI_USER_ID", "TERMAI")
+
+# Keep service alive for Render
+import time
+import threading
+
+def keep_alive():
+    """Keep the service running for cloud deployment"""
+    while True:
+        time.sleep(30)
+        print("🔄 Service alive...")
 
 def on_connect(client, userdata, flags, rc):
     print(f"✅ Connected to MQTT Broker with code {rc}")
@@ -52,5 +62,12 @@ client.on_connect = on_connect
 client.on_message = on_message
 
 print("🚀 Starting TermChat MQTT AI Service...")
+print(f"🔗 Connecting to {MQTT_BROKER}:{MQTT_PORT}")
+print(f"🤖 AI User ID: {AI_USER_ID}")
+
+# Start keep-alive thread for cloud deployment
+keep_alive_thread = threading.Thread(target=keep_alive, daemon=True)
+keep_alive_thread.start()
+
 client.connect(MQTT_BROKER, MQTT_PORT, 60)
 client.loop_forever()
