@@ -93,6 +93,28 @@
         body {
             background: var(--term-bg) !important;
             color: var(--term-color) !important;
+            font-family: 'Courier New', Courier, monospace !important;
+        }
+        
+        /* Cross-browser compatibility */
+        input, button {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        }
+        
+        /* Firefox fixes */
+        @-moz-document url-prefix() {
+            body {
+                font-family: 'Courier New', monospace;
+            }
+        }
+        
+        /* Safari fixes */
+        @supports (-webkit-appearance: none) {
+            input {
+                -webkit-text-size-adjust: 100%;
+            }
         }
 
         /* Container and Layout */
@@ -655,34 +677,44 @@
                 const buttonStyle = isMobile ? 'padding:15px; font-size:16px;' : 'padding:10px;';
                 const inputStyle = isMobile ? 'padding:15px; font-size:16px;' : 'padding:10px;';
                 
-                // Ensure body styling for Chrome
+                // Ensure body styling for all browsers
                 document.body.style.backgroundColor = '#050505';
                 document.body.style.color = '#33ff00';
                 document.body.style.fontFamily = 'Courier New, monospace';
                 document.body.style.margin = '0';
                 document.body.style.padding = '0';
                 document.body.style.height = '100vh';
+                document.body.style.overflow = 'hidden';
                 
                 document.body.innerHTML = `
-                    <div style="display:flex; justify-content:center; align-items:center; height:100vh; padding:20px; background:#050505; min-height:100vh;">
-                        <div style="border: 2px solid #33ff00; padding: 40px; background: rgba(0,20,0,0.9); max-width:400px; width:100%; border-radius:5px;">
-                            <h2 style="text-align:center; color:#33ff00; margin:0 0 20px 0; font-family: 'Courier New', monospace; font-size:24px;">TERMOS LT</h2>
+                    <div style="display:flex; justify-content:center; align-items:center; height:100vh; padding:20px; background:#050505; min-height:100vh; box-sizing:border-box;">
+                        <div style="border: 2px solid #33ff00; padding: 40px; background: rgba(0,20,0,0.9); max-width:400px; width:100%; border-radius:5px; box-sizing:border-box;">
+                            <h2 style="text-align:center; color:#33ff00; margin:0 0 20px 0; font-family: 'Courier New', monospace; font-size:24px; font-weight:bold;">TERMOS LT</h2>
                             <p style="color:#33ff00; text-align:center; margin:0 0 20px 0; font-family: 'Courier New', monospace; font-size:14px;">PRISIJUNKITE VARTOTOJU</p>
-                            <input type="text" id="usernameInput" placeholder="Username" 
-                                   style="background:#000; border:1px solid #33ff00; color:#33ff00; width:100%; ${inputStyle} box-sizing:border-box; margin-bottom:20px; font-family: 'Courier New', monospace; display:block;">
+                            <input type="text" id="usernameInput" placeholder="Username" maxlength="12" 
+                                   style="background:#000; border:1px solid #33ff00; color:#33ff00; width:100%; ${inputStyle} box-sizing:border-box; margin-bottom:20px; font-family: 'Courier New', monospace; display:block; outline:none;">
                             <button onclick="login()" 
-                                    style="background:#33ff00; color:#000; width:100%; ${buttonStyle} font-weight:bold; cursor:pointer; border:none; box-sizing:border-box; font-family: 'Courier New', monospace; display:block;">ENTER SYSTEM</button>
+                                    style="background:#33ff00; color:#000; width:100%; ${buttonStyle} font-weight:bold; cursor:pointer; border:none; box-sizing:border-box; font-family: 'Courier New', monospace; display:block; outline:none;">ENTER SYSTEM</button>
                         </div>
                     </div>
                 `;
                 
-                // Focus input after render
+                // Focus input after render with browser compatibility
                 setTimeout(() => {
                     const input = document.getElementById('usernameInput');
                     if (input) {
                         input.focus();
                         input.addEventListener('keypress', function(e) {
-                            if (e.key === 'Enter') login();
+                            if (e.key === 'Enter' || e.keyCode === 13) {
+                                e.preventDefault();
+                                login();
+                            }
+                        });
+                        
+                        // Input validation
+                        input.addEventListener('input', function(e) {
+                            const value = e.target.value;
+                            e.target.value = value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
                         });
                     }
                 }, 100);
@@ -813,19 +845,19 @@
             return colors[type] || '#33ff00';
         }
         function login() {
-            const username = document.getElementById('usernameInput').value.trim();
-            if (username.length >= 3) {
-                // Simple chat interface
+            const username = document.getElementById('usernameInput').value.trim().toUpperCase();
+            if (username && username.length >= 3 && username.length <= 12) {
+                // Simple chat interface with cross-browser styling
                 document.body.innerHTML = `
-                    <div style="height:100vh; display:flex; flex-direction:column; background:#050505; color:#33ff00; font-family:monospace; padding:10px;">
-                        <div style="border-bottom:1px solid #33ff00; padding:10px; text-align:center;">
-                            <h3>TERMCHAT LT - ${username}</h3>
+                    <div style="height:100vh; display:flex; flex-direction:column; background:#050505; color:#33ff00; font-family:'Courier New',monospace; padding:10px; box-sizing:border-box; overflow:hidden;">
+                        <div style="border-bottom:1px solid #33ff00; padding:10px; text-align:center; flex-shrink:0;">
+                            <h3 style="margin:0; color:#33ff00; font-family:'Courier New',monospace;">TERMCHAT LT - ${username}</h3>
                         </div>
-                        <div id="messages" style="flex:1; overflow-y:auto; padding:10px; background:#000; margin:10px 0;"></div>
-                        <div style="display:flex; gap:10px;">
-                            <input id="messageInput" type="text" placeholder="Type message..." 
-                                   style="flex:1; background:#000; border:1px solid #33ff00; color:#33ff00; padding:10px; font-family:monospace;">
-                            <button onclick="sendMsg()" style="background:#33ff00; color:#000; border:none; padding:10px 20px; cursor:pointer;">SEND</button>
+                        <div id="messages" style="flex:1; overflow-y:auto; padding:10px; background:#000; margin:10px 0; border:1px solid #33ff00; box-sizing:border-box;"></div>
+                        <div style="display:flex; gap:10px; flex-shrink:0;">
+                            <input id="messageInput" type="text" placeholder="Type message..." maxlength="500" 
+                                   style="flex:1; background:#000; border:1px solid #33ff00; color:#33ff00; padding:10px; font-family:'Courier New',monospace; box-sizing:border-box; outline:none;">
+                            <button onclick="sendMsg()" style="background:#33ff00; color:#000; border:none; padding:10px 20px; cursor:pointer; font-family:'Courier New',monospace; font-weight:bold; outline:none;">SEND</button>
                         </div>
                     </div>
                 `;
@@ -833,11 +865,21 @@
                 window.username = username;
                 connectMQTT();
                 
-                document.getElementById('messageInput').addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') sendMsg();
-                });
+                // Enhanced input handling
+                const messageInput = document.getElementById('messageInput');
+                if (messageInput) {
+                    messageInput.addEventListener('keypress', function(e) {
+                        if (e.key === 'Enter' || e.keyCode === 13) {
+                            e.preventDefault();
+                            sendMsg();
+                        }
+                    });
+                    
+                    // Auto-focus with delay for browser compatibility
+                    setTimeout(() => messageInput.focus(), 200);
+                }
             } else {
-                alert('Username must be at least 3 characters');
+                alert('Username must be 3-12 characters (letters and numbers only)');
             }
         }
         
