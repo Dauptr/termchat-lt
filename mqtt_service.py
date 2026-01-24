@@ -1,3 +1,5 @@
+import sys
+import signal
 import paho.mqtt.client as mqtt
 import json
 import os
@@ -9,6 +11,18 @@ from dotenv import load_dotenv
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from zhipuai import ZhipuAI
 
+# Render compatibility
+if 'RENDER' in os.environ:
+    print("[RENDER] Running on Render platform")
+
+# Signal handler for graceful shutdown
+def signal_handler(sig, frame):
+    print("[SHUTDOWN] Graceful shutdown initiated")
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
+
 # ==========================================
 # GLOBAL VARIABLES (Ensure these are at the TOP of your file)
 # ==========================================
@@ -18,15 +32,20 @@ conv_history = []
 # Generate secure admin token
 admin_token = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
 
-# Load Config
+# Load Config with Render support
 load_dotenv()
 ZHIPU_API_KEY = os.getenv("ZHIPU_API_KEY")
 PORT = int(os.getenv("PORT", 10000))
+
+# Render uses PORT environment variable
+if 'RENDER' in os.environ:
+    PORT = int(os.environ.get('PORT', 10000))
 
 print(f"[TERMOS] God Mode Backend Starting...")
 print(f"[SECURITY] ADMIN TOKEN: {admin_token}")
 print(f"[CONFIG] API Key: {bool(ZHIPU_API_KEY)}")
 print(f"[CONFIG] Port: {PORT}")
+print(f"[CONFIG] Platform: {'Render' if 'RENDER' in os.environ else 'Local'}")
 
 # AI Client
 zhipu_client = ZhipuAI(api_key=ZHIPU_API_KEY) if ZHIPU_API_KEY else None
@@ -332,7 +351,20 @@ if __name__ == '__main__':
     try:
         client.connect("broker.emqx.io", 1883, 60)
         print("[MQTT] Connected to broker")
-        client.loop_forever()
+        
+        # For Render, we need to handle the event loop differently
+        if 'RENDER' in os.environ:
+            print("[RENDER] Starting MQTT loop for cloud deployment")
+            client.loop_start()
+            # Keep the main thread alive
+            while True:
+                time.sleep(1)
+        else:
+            client.loop_forever()
+            
     except KeyboardInterrupt:
         print("[TERMOS] Shutting down...")
         client.disconnect()
+    except Exception as e:
+        print(f"[ERROR] MQTT connection failed: {e}")
+        sys.exit(1)

@@ -3,18 +3,14 @@ services:
   - type: web
     name: termchat-mqtt-bot
     env: python
-    buildCommand: pip install -r requirements.txt
+    plan: free
+    buildCommand: ./build.sh
     startCommand: python mqtt_service.py
+    healthCheckPath: /
     envVars:
       - key: ZHIPU_API_KEY
-        value: 42b0a4fbe60e4568ba1b74d5e8d030d6.xSVMYljtqVXmRr33
+        sync: false
       - key: AI_PROVIDER
         value: zhipu
-      - key: PORT
-        value: 10000
-      - key: MQTT_BROKER
-        value: broker.emqx.io
-      - key: MQTT_PORT
-        value: 1883
-      - key: AI_USER_ID
-        value: TERMAI
+      - key: RENDER
+        value: true
