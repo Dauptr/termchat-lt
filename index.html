@@ -403,32 +403,83 @@
                 mqttClient = new Paho.MQTT.Client("broker.emqx.io", 8084, "client_" + Math.random());
                 
                 mqttClient.onMessageArrived = function(message) {
+                    const payload = message.payloadString;
+                    
+                    // --- SMART ROUTER: ATTEMPT TO PARSE JSON ---
                     try {
-                        const data = JSON.parse(message.payloadString);
+                        const data = JSON.parse(payload);
                         
-                        // Handle different message types
-                        if (data.type === 'creation' && data.creation) {
-                            // AI created app/game
-                            if (data.creation.type === 'app') {
-                                switchMode('app', data.creation);
-                                addMessage('TERMAI', 'Created app for you!');
-                            } else if (data.creation.type === 'game') {
-                                switchMode('game', data.creation);
-                                addMessage('TERMAI', 'Started game for you!');
-                            }
-                        } else if (data.type === 'navigation') {
+                        // --- APP DETECTED ---
+                        if (data.type === 'creation' && data.creation && data.creation.type === 'app') {
+                            switchMode('app', data.creation);
+                            addMessage('TERMAI', 'Created app for you!');
+                            return; // Stop processing
+                        }
+                        
+                        // --- GAME DETECTED ---
+                        if (data.type === 'creation' && data.creation && data.creation.type === 'game') {
+                            switchMode('game', data.creation);
+                            addMessage('TERMAI', 'Started game for you!');
+                            return; // Stop processing
+                        }
+                        
+                        // --- DIRECT APP/GAME (Legacy format) ---
+                        if (data.app_name && data.files) {
+                            switchMode('app', data);
+                            return; // Stop processing
+                        }
+                        if (data.scene && data.options) {
+                            switchMode('game', data);
+                            return; // Stop processing
+                        }
+                        
+                        // --- TUNNEL DETECTED ---
+                        if (data.sender && data.data) {
+                            acceptTunnel(data);
+                            return; // Stop processing
+                        }
+                        
+                        // --- VIDEO SIGNAL ---
+                        if (data.type === 'webrtc') {
+                            handleWebRTC(data);
+                            return; // Stop processing
+                        }
+                        
+                        // --- NAVIGATION ---
+                        if (data.type === 'navigation') {
                             switchRoom(data.room);
                             addMessage('TERMOS', data.msg);
-                        } else if (data.type === 'admin') {
-                            addAdminLog(data.msg);
-                        } else if (data.user && data.text) {
-                            addMessage(data.user, data.text);
-                        } else if (data.id && data.msg) {
-                            addMessage(data.id, data.msg);
+                            return; // Stop processing
                         }
-                    } catch(e) {
-                        addMessage('SYSTEM', message.payloadString);
+                        
+                        // --- ADMIN RESPONSE ---
+                        if (data.type === 'admin') {
+                            addAdminLog(data.msg);
+                            return; // Stop processing
+                        }
+                        
+                        // --- REGULAR CHAT MESSAGES ---
+                        if (data.user && data.text) {
+                            addMessage(data.user, data.text);
+                            return; // Stop processing
+                        }
+                        if (data.id && data.msg) {
+                            addMessage(data.id, data.msg);
+                            return; // Stop processing
+                        }
+                        
+                    } catch (e) {
+                        // It's text, not JSON. Continue to text chat logic.
                     }
+                    
+                    // --- TEXT CHAT LOGIC (XSS Protected) ---
+                    const chatBody = document.getElementById('terminal-body');
+                    const msgDiv = document.createElement('div');
+                    msgDiv.style.marginBottom = '5px';
+                    msgDiv.style.color = 'var(--term-color)';
+                    msgDiv.textContent = payload; // SECURE - prevents XSS
+                    chatBody.appendChild(msgDiv);
+                    chatBody.scrollTop = chatBody.scrollHeight;
                 };
                 
                 mqttClient.connect({
@@ -437,6 +488,8 @@
                         mqttClient.subscribe('termchat/messages');
                         mqttClient.subscribe('termchat/output');
                         mqttClient.subscribe('termchat/admin');
+                        mqttClient.subscribe('termchat/tunnel/+');
+                        mqttClient.subscribe('termchat/webrtc/+');
                     },
                     onFailure: function() {
                         addMessage('ERROR', 'Failed to connect to multiverse');
@@ -497,6 +550,44 @@
             terminal.scrollTop = terminal.scrollHeight;
         }
 
+        // --- TUNNEL HANDLER ---
+        function acceptTunnel(data) {
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0,0,0,0.8); display: flex;
+                justify-content: center; align-items: center; z-index: 2000;
+            `;
+            modal.innerHTML = `
+                <div style="background: var(--bg-color); border: 2px solid var(--term-color); padding: 20px; text-align: center;">
+                    <h3>TUNNEL REQUEST</h3>
+                    <p>User ${data.sender} wants to connect</p>
+                    <div style="margin-top: 20px;">
+                        <button onclick="acceptTunnelConnection('${data.sender}'); this.parentElement.parentElement.parentElement.remove();">ACCEPT</button>
+                        <button onclick="this.parentElement.parentElement.parentElement.remove();">DECLINE</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        function acceptTunnelConnection(sender) {
+            addMessage('SYSTEM', `Tunnel established with ${sender}`);
+            // Additional tunnel logic here
+        }
+
+        // --- WEBRTC HANDLER ---
+        function handleWebRTC(data) {
+            if (data.action === 'offer') {
+                addMessage('SYSTEM', `Video call from ${data.sender}`);
+                switchMode('video');
+            } else if (data.action === 'answer') {
+                addMessage('SYSTEM', 'Video call answered');
+            } else if (data.action === 'ice-candidate') {
+                // Handle ICE candidate
+                console.log('ICE candidate received:', data);
+            }
+        }
         function switchRoom(room) {
             currentRoom = room;
             const themes = {
