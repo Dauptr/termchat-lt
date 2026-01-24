@@ -169,15 +169,38 @@
         .theme-think { --term-color: #00ff41; }
         .theme-lounge { --term-color: #ff3333; }
 
-        /* ANIMATIONS */
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-        .cursor { 
-            display: inline-block; 
-            width: 10px; 
-            height: 1.2em; 
-            background: var(--term-color); 
-            animation: blink 1s step-end infinite; 
-            vertical-align: text-bottom; 
+        /* MULTIVERSE OS ENHANCEMENTS */
+        .voice-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 255, 0, 0.2);
+            border: 1px solid var(--term-color);
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            z-index: 500;
+            display: none;
+        }
+        
+        .voice-indicator.active {
+            display: block;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+        
+        .image-placeholder {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px dashed var(--term-color);
+            padding: 20px;
+            margin: 5px 0;
+            text-align: center;
+            border-radius: 5px;
         }
 
         /* LOGIN SCREEN */
@@ -226,6 +249,9 @@
 </head>
 <body class="theme-living">
     <script src="./paho-mqtt.min.js"></script>
+    
+    <!-- Voice Indicator -->
+    <div id="voice-indicator" class="voice-indicator">🔊 Speaking...</div>
     
     <!-- LOGIN SCREEN -->
     <div id="loginScreen" class="login-screen">
@@ -582,18 +608,33 @@
             const text = input.value.trim();
             if (text && mqttClient) {
                 // Check for special commands
-                if (text.toLowerCase().includes('create app') || text.toLowerCase().includes('make app')) {
+                if (text === '/mute') {
+                    speechSynthesis.cancel();
+                    addMessage('SYSTEM', 'Voice synthesis muted');
+                    input.value = '';
+                    return;
+                } else if (text === '/speak') {
+                    addMessage('SYSTEM', 'Voice synthesis enabled');
+                    input.value = '';
+                    return;
+                } else if (text.toLowerCase().includes('create app') || text.toLowerCase().includes('make app')) {
                     // Will trigger AI to create app
                 } else if (text.toLowerCase().includes('start game') || text.toLowerCase().includes('play game')) {
                     // Will trigger AI to create game
+                } else if (text.startsWith('![') && text.includes(']')) {
+                    // Image generation request
+                    addMessage(username, text);
                 } else if (text === '/video') {
                     switchMode('video');
+                    input.value = '';
                     return;
                 } else if (text === '/admin') {
                     switchMode('admin');
+                    input.value = '';
                     return;
                 } else if (text === '/chat') {
                     switchMode('chat');
+                    input.value = '';
                     return;
                 }
                 
@@ -617,16 +658,55 @@
             // Color coding
             if (user === 'SYSTEM') div.style.color = '#00ff00';
             else if (user === 'ERROR') div.style.color = '#ff0000';
-            else if (user === 'TERMAI') div.style.color = '#00ff41';
+            else if (user === 'TERMAI') {
+                div.style.color = '#00ff41';
+                // Auto-speak TERMAI responses
+                const lang = text.includes('ą') || text.includes('ė') || text.includes('į') ? 'lt-LT' : 'en-US';
+                setTimeout(() => speakText(text, lang), 500);
+            }
             else if (user === 'TERMOS') div.style.color = '#ffff00';
             else div.style.color = 'var(--term-color)';
             
-            div.textContent = `[${user}] ${text}`;
+            // Process image markdown
+            const processedText = processImageMarkdown(text);
+            div.textContent = `[${user}] ${processedText}`;
             terminal.appendChild(div);
             terminal.scrollTop = terminal.scrollHeight;
         }
 
-        // --- TUNNEL HANDLER ---
+        // --- TERMAI FUNCTIONS (Priority 3) ---
+        
+        // Voice Synthesis API
+        function speakText(text, lang = 'en-US') {
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = lang;
+                utterance.rate = 0.9;
+                utterance.pitch = 1.0;
+                speechSynthesis.speak(utterance);
+                return true;
+            }
+            return false;
+        }
+        
+        // Image Generation Support
+        function processImageMarkdown(text) {
+            const imageRegex = /!\[([^\]]+)\]/g;
+            return text.replace(imageRegex, (match, description) => {
+                const imageId = 'img_' + Math.random().toString(36).substr(2, 9);
+                // Request image generation from backend
+                if (mqttClient) {
+                    const imageRequest = {
+                        id: username,
+                        msg: `generate image: ${description}`,
+                        type: 'image_request',
+                        timestamp: Date.now()
+                    };
+                    mqttClient.publish('termchat/input', JSON.stringify(imageRequest));
+                }
+                return `[🎨 Generating image: ${description}...]`;
+            });
+        }
         function acceptTunnel(data) {
             const modal = document.createElement('div');
             modal.style.cssText = `
