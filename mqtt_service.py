@@ -35,6 +35,25 @@ zhipu_client = ZhipuAI(api_key=ZHIPU_API_KEY) if ZHIPU_API_KEY else None
 active_users = {}
 admin_sessions = set()
 
+# User activity cleanup task
+def cleanup_inactive_users():
+    """Remove inactive users periodically"""
+    current_time = time.time()
+    inactive_users = []
+    
+    for user_id, data in active_users.items():
+        if current_time - data.get('last_message', 0) > 3600:  # 1 hour timeout
+            inactive_users.append(user_id)
+    
+    for user_id in inactive_users:
+        del active_users[user_id]
+        print(f"[CLEANUP] Removed inactive user: {user_id}")
+
+# Schedule cleanup every 10 minutes
+def start_cleanup_timer():
+    cleanup_inactive_users()
+    threading.Timer(600, start_cleanup_timer).start()
+
 # Room-Specific AI Prompts
 ROOM_PROMPTS = {
     "living_room": """Tu esi TermAi, TermOS LT sistemos AI asistentas. Padėk vartotojams naviguoti tarp kambarių: biblioteka, studija, dirbtuvės, poilsio, laboratorija. Kalbėk lietuviškai.""",
@@ -136,8 +155,25 @@ def on_message(client, userdata, message, properties=None):
 
     # Handle both termchat/input and termchat/messages topics
     if topic in ["termchat/input", "termchat/messages"]:
-        # Process the message for AI triggers
-        pass
+        # Validate message content
+        if len(message_text) > 500:
+            print(f"[SECURITY] Message too long from {user_id}: {len(message_text)} chars")
+            return
+            
+        # Rate limiting per user
+        current_time = time.time()
+        if user_id in active_users:
+            last_msg_time = active_users[user_id].get('last_message', 0)
+            if current_time - last_msg_time < 1:  # 1 second cooldown
+                print(f"[RATE_LIMIT] User {user_id} sending too fast")
+                return
+        
+        # Update user activity
+        active_users[user_id] = {
+            'last_message': current_time,
+            'message_count': active_users.get(user_id, {}).get('message_count', 0) + 1
+        }
+        
     elif topic == "termchat/admin":
         resp = handle_admin(message_text)
         client.publish("termchat/output", json.dumps({
@@ -203,45 +239,57 @@ def on_message(client, userdata, message, properties=None):
             
         messages_to_send = [sys_msg] + conv_history[-10:]
         
-        # Call AI
-        try:
-            reply = ai_call(messages_to_send, current_room)
-            
-            # Check if response is JSON (for apps/games)
+            # Enhanced error handling and logging
             try:
-                json_response = json.loads(reply)
-                if json_response.get("type") in ["app", "game"]:
-                    # Send as special JSON message
-                    client.publish("termchat/output", json.dumps({
-                        "type": "creation",
-                        "id": "TERMAI",
-                        "msg": "Sukūriau jums:",
-                        "creation": json_response
-                    }))
-                    conv_history.append({"role": "assistant", "content": reply})
-                    return
-            except:
-                pass  # Not JSON, send as regular message
-            
-            client.publish("termchat/output", json.dumps({
-                "type": "chat",
-                "id": "TERMAI", 
-                "msg": reply
-            }))
-            # Also publish to messages topic for compatibility
-            client.publish("termchat/messages", json.dumps({
-                "user": "TERMAI",
-                "text": reply
-            }))
-            conv_history.append({"role": "assistant", "content": reply})
-            
-        except Exception as e:
-            print(f"[ERROR] AI Failed: {e}")
-            client.publish("termchat/output", json.dumps({
-                "type": "chat",
-                "id": "TERMAI",
-                "msg": f"Klaida: {str(e)}"
-            }))
+                reply = ai_call(messages_to_send, current_room)
+                
+                # Validate AI response
+                if not reply or len(reply) > 1000:
+                    reply = "AI response error or too long"
+                
+                # Check if response is JSON (for apps/games)
+                try:
+                    json_response = json.loads(reply)
+                    if json_response.get("type") in ["app", "game"]:
+                        # Send as special JSON message
+                        client.publish("termchat/output", json.dumps({
+                            "type": "creation",
+                            "id": "TERMAI",
+                            "msg": "Sukūriau jums:",
+                            "creation": json_response
+                        }))
+                        conv_history.append({"role": "assistant", "content": reply})
+                        return
+                except json.JSONDecodeError:
+                    pass  # Not JSON, send as regular message
+                
+                # Sanitize AI response
+                reply = str(reply).replace('<', '&lt;').replace('>', '&gt;')[:500]
+                
+                client.publish("termchat/output", json.dumps({
+                    "type": "chat",
+                    "id": "TERMAI", 
+                    "msg": reply
+                }))
+                # Also publish to messages topic for compatibility
+                client.publish("termchat/messages", json.dumps({
+                    "user": "TERMAI",
+                    "text": reply
+                }))
+                conv_history.append({"role": "assistant", "content": reply})
+                
+            except Exception as e:
+                error_msg = f"AI Error: {str(e)[:100]}"
+                print(f"[ERROR] AI Failed: {e}")
+                client.publish("termchat/output", json.dumps({
+                    "type": "chat",
+                    "id": "TERMAI",
+                    "msg": error_msg
+                }))
+                client.publish("termchat/messages", json.dumps({
+                    "user": "TERMAI",
+                    "text": error_msg
+                }))
 
 def run_http_server():
     """HTTP server for health checks"""
@@ -266,6 +314,9 @@ def run_http_server():
 # --- STARTUP ---
 if __name__ == '__main__':
     print("[TERMOS] Starting God Mode Backend...")
+    
+    # Start cleanup timer
+    start_cleanup_timer()
     
     # Start HTTP server in background
     http_thread = threading.Thread(target=run_http_server)
