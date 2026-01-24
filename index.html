@@ -18,14 +18,28 @@
 
     <style>
         /* --- CRT & RETRO EFFECTS --- */
+        * {
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow-x: hidden;
+        }
+        
         body {
             background-color: #050505;
             color: #33ff00;
             font-family: 'Courier New', Courier, monospace;
             overflow: hidden;
             height: 100vh;
-            margin: 0;
             text-shadow: 0 0 4px #33ff00;
+            -webkit-text-size-adjust: 100%;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         /* Scanlines Overlay */
@@ -894,6 +908,7 @@
                 input.value = '';
             }
         }
+        function login() {
             const username = document.getElementById('usernameInput').value.trim();
             if (username.length >= 3) {
                 loadMainInterface(username);
