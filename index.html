@@ -747,6 +747,8 @@
 
         function connectMQTT() {
             try {
+                addMessage('SYSTEM', 'Connecting to MQTT broker...');
+                
                 // Enhanced WebSocket connection with fallback
                 const clientId = "client_" + Math.random().toString(36).substr(2, 9);
                 mqttClient = new Paho.MQTT.Client("broker.emqx.io", 8084, clientId);
@@ -754,7 +756,7 @@
                 // Connection options with enhanced reliability
                 const connectOptions = {
                     onSuccess: function() {
-                        addMessage('SYSTEM', 'Connected to TermOS LT Multiverse!');
+                        addMessage('SYSTEM', '✅ Connected to TermOS LT Multiverse!');
                         
                         // Subscribe to channels (including room-specific if shared)
                         const topics = ['termchat/messages', 'termchat/output', 'termchat/admin', 'termchat/tunnel/+', 'termchat/webrtc/+'];
@@ -764,7 +766,10 @@
                             addMessage('SYSTEM', `Joined shared room: ${roomId}`);
                         }
                         
-                        topics.forEach(topic => mqttClient.subscribe(topic));
+                        topics.forEach(topic => {
+                            mqttClient.subscribe(topic);
+                            console.log('Subscribed to:', topic);
+                        });
                         
                         // Send connection announcement
                         const connectMsg = {
@@ -775,17 +780,23 @@
                         
                         const publishTopic = roomId ? `termchat/room/${roomId}` : 'termchat/messages';
                         mqttClient.publish(publishTopic, JSON.stringify(connectMsg));
+                        
+                        // Test message
+                        addMessage('SYSTEM', 'Connection established. Try typing "ai hello" to test AI.');
                     },
                     onFailure: function(error) {
-                        addMessage('ERROR', `Connection failed: ${error.errorMessage || 'Unknown error'}`);
+                        console.error('MQTT Connection failed:', error);
+                        addMessage('ERROR', `❌ Connection failed: ${error.errorMessage || 'WebSocket blocked or broker unavailable'}`);
+                        addMessage('SYSTEM', 'Check: 1) Network connection 2) Firewall/proxy blocking WebSocket 3) Try different network');
+                        
                         // Retry connection after 5 seconds
                         setTimeout(() => {
-                            addMessage('SYSTEM', 'Retrying connection...');
+                            addMessage('SYSTEM', '🔄 Retrying connection...');
                             connectMQTT();
                         }, 5000);
                     },
                     useSSL: true,
-                    timeout: 10,
+                    timeout: 15,
                     keepAliveInterval: 30,
                     cleanSession: true
                 };
@@ -793,8 +804,9 @@
                 // Connection lost handler
                 mqttClient.onConnectionLost = function(responseObject) {
                     if (responseObject.errorCode !== 0) {
-                        addMessage('ERROR', `Connection lost: ${responseObject.errorMessage}`);
-                        addMessage('SYSTEM', 'Attempting to reconnect...');
+                        console.error('MQTT Connection lost:', responseObject);
+                        addMessage('ERROR', `❌ Connection lost: ${responseObject.errorMessage}`);
+                        addMessage('SYSTEM', '🔄 Attempting to reconnect...');
                         setTimeout(() => connectMQTT(), 3000);
                     }
                 };
@@ -887,9 +899,12 @@
                 };
                 
                 // Initiate connection
+                console.log('Attempting MQTT connection to broker.emqx.io:8084 with SSL');
                 mqttClient.connect(connectOptions);
             } catch(e) {
-                addMessage('ERROR', 'MQTT Error: ' + e.message);
+                console.error('MQTT Setup Error:', e);
+                addMessage('ERROR', 'MQTT Setup Error: ' + e.message);
+                addMessage('SYSTEM', 'This might be a browser compatibility issue. Try Chrome/Firefox.');
             }
         }
 
