@@ -66,10 +66,42 @@
             text-shadow: 0 0 5px var(--term-color);
         }
 
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 10px; }
-        ::-webkit-scrollbar-thumb { background: var(--term-color, #33ff00); }
-        ::-webkit-scrollbar-track { background: #000; }
+        /* Container and Layout */
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            padding: 10px;
+        }
+
+        .ascii-header {
+            border-bottom: 1px solid var(--term-color);
+            margin-bottom: 10px;
+        }
+
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--term-color);
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .input-line {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .input-line input {
+            flex: 1;
+            background: #000;
+            border: 1px solid var(--term-color);
+            color: var(--term-color);
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+        }
 
         /* Boot Screen */
         #boot-screen {
@@ -577,19 +609,404 @@
                 <!-- Hidden panels will be injected via JS -->
             `;
         }
-        function login() {
+        // Multiverse Frontend Functions
+        function initMqtt(user) {
+            // Initialize MQTT connection
+            const client = new Paho.MQTT.Client("broker.emqx.io", 8084, "termos_" + Math.random().toString(36).substr(2, 9));
+            
+            client.onConnectionLost = (responseObject) => {
+                if (responseObject.errorCode !== 0) {
+                    log("[SYSTEM] Connection lost: " + responseObject.errorMessage, 'error');
+                }
+            };
+            
+            client.onMessageArrived = (message) => {
+                const topic = message.destinationName;
+                const payload = message.payloadString;
+                
+                // --- ROUTER ---
+                try {
+                    const data = JSON.parse(payload);
+                    
+                    // 1. APP DETECTED
+                    if (data.creation && data.creation.type === 'app') {
+                        openIDE(data.creation);
+                    }
+                    // 2. GAME DETECTED
+                    else if (data.creation && data.creation.type === 'game') {
+                        renderGame(data.creation);
+                    }
+                    // 3. TUNNEL DETECTED
+                    else if (data.sender && topic.includes('tunnel')) {
+                        acceptTunnel(data);
+                    }
+                    // 4. VIDEO SIGNAL (WebRTC)
+                    else if (data.type === 'webrtc') {
+                        handleWebRTCSignal(data);
+                    }
+                    // 5. ADMIN RESPONSE
+                    else if (data.type === 'admin') {
+                        displayAdminResponse(data.msg);
+                    }
+                    // 6. NAVIGATION
+                    else if (data.type === 'navigation') {
+                        changeRoom(data.room, data.msg);
+                    }
+                    // 7. REGULAR CHAT
+                    else {
+                        log(`[${data.id || 'SYSTEM'}] ${data.msg}`, getMessageType(data));
+                    }
+                } catch(e) {
+                    // TEXT MESSAGE
+                    if (topic.includes('termchat/room/')) {
+                        log(`[PRIVATE] ${payload}`, 'private');
+                    } else {
+                        log(payload, 'msg');
+                    }
+                }
+            };
+            
+            // Connect and subscribe
+            client.connect({
+                onSuccess: () => {
+                    log("[TERMOS] Connected to multiverse!", 'system');
+                    // Subscribe to channels
+                    client.subscribe("termchat/output");
+                    client.subscribe("termchat/admin");
+                    client.subscribe(`termchat/tunnel/${user}`);
+                    client.subscribe(`termchat/room/${user}`);
+                    
+                    // Set room header
+                    updateRoomHeader("🏠 LIVING ROOM");
+                },
+                onFailure: (error) => {
+                    log("[ERROR] Connection failed: " + error.errorMessage, 'error');
+                },
+                useSSL: true
+            });
+            
+            // Store client globally
+            window.mqttClient = client;
+            window.currentUser = user;
+            
+            // Setup input handler
+            const chatInput = document.getElementById('chatInput');
+            chatInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    sendMessage(chatInput.value);
+                    chatInput.value = '';
+                }
+            });
+        }
+
+        // Panel Management
+        function openPanel(panelId) {
+            document.getElementById(panelId).style.display = 'block';
+        }
+
+        function closePanel(panelId) {
+            document.getElementById(panelId).style.display = 'none';
+        }
+
+        // Messaging
+        function sendMessage(text) {
+            if (text.trim() && window.mqttClient) {
+                const message = {
+                    id: window.currentUser,
+                    msg: text,
+                    timestamp: Date.now()
+                };
+                window.mqttClient.publish("termchat/input", JSON.stringify(message));
+                log(`[${window.currentUser}] ${text}`, 'user');
+            }
+        }
+
+        function log(text, type = 'msg') {
+            const terminal = document.getElementById('terminal-body');
+            const div = document.createElement('div');
+            div.style.color = getTypeColor(type);
+            div.style.marginBottom = '5px';
+            div.innerHTML = text;
+            terminal.appendChild(div);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        function getTypeColor(type) {
+            const colors = {
+                'system': 'var(--term-color)',
+                'user': '#00ffff',
+                'error': '#ff3333',
+                'private': '#ffff00',
+                'ai': '#00ff00'
+            };
+            return colors[type] || 'var(--term-color)';
+        }
+
+        function getMessageType(data) {
+            if (data.id === 'TERMAI') return 'ai';
+            if (data.id === 'ADMIN') return 'system';
+            return 'msg';
+        }
+
+        // Room Management
+        function updateRoomHeader(roomName) {
+            document.getElementById('room-header').innerHTML = `
+                <h2 style="color:var(--term-color); text-align:center; margin:10px 0;">${roomName}</h2>
+                <div style="text-align:center; font-size:12px; color:var(--term-color); opacity:0.7;">
+                    Navigation: "eiti biblioteka" | "go studio" | "enter workshop" | "visit lounge" | "think tank"
+                </div>
+            `;
+        }
+
+        function changeRoom(room, message) {
+            const roomNames = {
+                'library': '📚 BIBLIOTEKA',
+                'studio': '🎨 STUDIJA',
+                'workshop': '💻 DIRBTUVĖS',
+                'lounge': '🎭 POILSIO KAMBARYS',
+                'think_tank': '🧠 LABORATORIJA',
+                'living_room': '🏠 NAMŲ KAMBARYS'
+            };
+            updateRoomHeader(roomNames[room] || room.toUpperCase());
+            log(message, 'system');
+        }
+
+        // IDE Functions
+        function openIDE(appData) {
+            document.getElementById('code-editor').value = appData.content || '// AI Generated App\nconsole.log("Hello from TermOS!");';
+            openPanel('ide-panel');
+            log(`[WORKSHOP] Opening IDE: ${appData.title}`, 'system');
+        }
+
+        function runCode() {
+            const code = document.getElementById('code-editor').value;
+            const output = document.getElementById('code-output');
+            try {
+                // Simple code execution (security risk in real app)
+                const result = eval(code);
+                output.innerHTML += `> ${result}\n`;
+            } catch (e) {
+                output.innerHTML += `ERROR: ${e.message}\n`;
+            }
+        }
+
+        function saveApp() {
+            const code = document.getElementById('code-editor').value;
+            log('[WORKSHOP] App saved to local storage', 'system');
+            localStorage.setItem('termos_app_' + Date.now(), code);
+        }
+
+        // Game Functions
+        function renderGame(gameData) {
+            const gameScreen = document.getElementById('game-screen');
+            gameScreen.innerHTML = `
+                <div style="color:var(--term-color); padding:20px; text-align:center;">
+                    <h3>${gameData.title}</h3>
+                    <div>${gameData.content}</div>
+                    <div style="margin-top:20px; font-size:24px;">🎮</div>
+                </div>
+            `;
+            openPanel('game-console');
+            log(`[LOUNGE] Loading game: ${gameData.title}`, 'system');
+        }
+
+        function gameAction(action) {
+            log(`[GAME] Action: ${action}`, 'system');
+            // Game logic would go here
+        }
+
+        // Admin Functions
+        function adminLogin() {
+            const password = document.getElementById('admin-pass').value;
+            if (password && window.mqttClient) {
+                window.mqttClient.publish("termchat/admin", password + " status");
+                document.getElementById('admin-commands').style.display = 'block';
+            }
+        }
+
+        function adminCommand(cmd) {
+            const password = document.getElementById('admin-pass').value;
+            if (password && window.mqttClient) {
+                window.mqttClient.publish("termchat/admin", password + " " + cmd);
+            }
+        }
+
+        function displayAdminResponse(response) {
+            const output = document.getElementById('admin-output');
+            output.innerHTML += `> ${response}\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        // Video Functions
+        function startVideo() {
+            navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                .then(stream => {
+                    document.getElementById('local-video').srcObject = stream;
+                    log('[VIDEO] Camera started', 'system');
+                })
+                .catch(err => {
+                    log(`[VIDEO] Error: ${err.message}`, 'error');
+                });
+        }
+
+        function stopVideo() {
+            const video = document.getElementById('local-video');
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+                log('[VIDEO] Camera stopped', 'system');
+            }
+        }
+
+        function callUser() {
+            const targetUser = document.getElementById('call-user').value;
+            if (targetUser && window.mqttClient) {
+                const signal = {
+                    type: 'webrtc',
+                    action: 'call',
+                    from: window.currentUser,
+                    to: targetUser
+                };
+                window.mqttClient.publish(`termchat/tunnel/${targetUser}`, JSON.stringify(signal));
+                log(`[VIDEO] Calling ${targetUser}...`, 'system');
+            }
+        }
+
+        function handleWebRTCSignal(data) {
+            log(`[VIDEO] WebRTC signal from ${data.from}: ${data.action}`, 'system');
+            // WebRTC logic would go here
+        }
+
+        // Tunnel Functions
+        function acceptTunnel(data) {
+            const content = document.getElementById('tunnel-content');
+            content.innerHTML += `[${data.sender}] ${data.message}\n`;
+            openPanel('tunnel-modal');
+            log(`[TUNNEL] Message from ${data.sender}`, 'system');
+        }
+
+        function sendTunnelMessage() {
+            const input = document.getElementById('tunnel-input');
+            const message = input.value.trim();
+            if (message && window.mqttClient) {
+                // This would send to a specific tunnel - simplified for demo
+                log(`[TUNNEL] Sent: ${message}`, 'system');
+                input.value = '';
+            }
+        }
             const username = document.getElementById('usernameInput').value.trim();
             if (username.length >= 3) {
-                // Initialize main system after login
-                initMainSystem(username);
+                loadMainInterface(username);
             } else {
                 alert('Username must be at least 3 characters');
             }
         }
 
-        function initMainSystem(username) {
-            // This will be expanded in Phase 2 with room system
-            document.body.innerHTML = '<div style="padding:20px; color:var(--term-color);">TERMOS LT SYSTEM LOADED<br>User: ' + username + '<br>Ready for Phase 2...</div>';
+        // After login, inject the Main Terminal Layout
+        function loadMainInterface(username) {
+            document.body.innerHTML = `
+                <div class="container">
+                    <!-- HEADER -->
+                    <div id="room-header" class="ascii-header"></div>
+                    <!-- MAIN CHAT -->
+                    <div id="terminal-body" class="chat-area"></div>
+                    <!-- INPUT -->
+                    <div class="input-line">
+                        <span style="color:var(--term-color)">USER:${username}&gt;</span>
+                        <input type="text" id="chatInput" autocomplete="off" autofocus>
+                    </div>
+                </div>
+
+                <!-- HIDDEN PANELS (Injected by JS) -->
+                <!-- 1. IDE PANEL (Workshop) -->
+                <div id="ide-panel" style="display:none; position:fixed; top:10%; left:10%; width:80%; height:80%; border: 2px solid var(--term-color); background:rgba(0,0,0,0.95); z-index:1000; padding:20px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                        <h3 style="color:var(--term-color);">💻 WORKSHOP IDE</h3>
+                        <button onclick="closePanel('ide-panel')" style="background:var(--term-color); color:#000; border:none; padding:5px 10px; cursor:pointer;">✕</button>
+                    </div>
+                    <textarea id="code-editor" style="width:100%; height:70%; background:#000; color:var(--term-color); border:1px solid var(--term-color); font-family:monospace; padding:10px;"></textarea>
+                    <div style="margin-top:10px;">
+                        <button onclick="runCode()" style="background:var(--term-color); color:#000; border:none; padding:10px 20px; cursor:pointer; margin-right:10px;">▶ RUN</button>
+                        <button onclick="saveApp()" style="background:var(--term-color); color:#000; border:none; padding:10px 20px; cursor:pointer;">💾 SAVE</button>
+                    </div>
+                    <div id="code-output" style="height:20%; background:#111; color:var(--term-color); border:1px solid var(--term-color); padding:10px; margin-top:10px; overflow-y:auto;"></div>
+                </div>
+
+                <!-- 2. GAME CONSOLE (Lounge) -->
+                <div id="game-console" style="display:none; position:fixed; top:10%; left:10%; width:80%; height:80%; border: 2px solid var(--term-color); background:rgba(0,0,0,0.95); z-index:1000; padding:20px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                        <h3 style="color:var(--term-color);">🎮 GAME CONSOLE</h3>
+                        <button onclick="closePanel('game-console')" style="background:var(--term-color); color:#000; border:none; padding:5px 10px; cursor:pointer;">✕</button>
+                    </div>
+                    <div id="game-screen" style="width:100%; height:80%; background:#000; border:1px solid var(--term-color); position:relative; overflow:hidden;"></div>
+                    <div style="margin-top:10px; text-align:center;">
+                        <button onclick="gameAction('up')" style="background:var(--term-color); color:#000; border:none; padding:10px; cursor:pointer; margin:2px;">↑</button><br>
+                        <button onclick="gameAction('left')" style="background:var(--term-color); color:#000; border:none; padding:10px; cursor:pointer; margin:2px;">←</button>
+                        <button onclick="gameAction('action')" style="background:var(--term-color); color:#000; border:none; padding:10px; cursor:pointer; margin:2px;">🔥</button>
+                        <button onclick="gameAction('right')" style="background:var(--term-color); color:#000; border:none; padding:10px; cursor:pointer; margin:2px;">→</button><br>
+                        <button onclick="gameAction('down')" style="background:var(--term-color); color:#000; border:none; padding:10px; cursor:pointer; margin:2px;">↓</button>
+                    </div>
+                </div>
+
+                <!-- 3. ADMIN PANEL -->
+                <div id="admin-panel" style="display:none; position:fixed; top:10%; left:10%; width:80%; height:80%; border: 2px solid var(--term-color); background:rgba(0,0,0,0.95); z-index:1000; padding:20px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                        <h3 style="color:var(--term-color);">👑 ADMIN CONTROL</h3>
+                        <button onclick="closePanel('admin-panel')" style="background:var(--term-color); color:#000; border:none; padding:5px 10px; cursor:pointer;">✕</button>
+                    </div>
+                    <div style="margin-bottom:20px;">
+                        <input type="password" id="admin-pass" placeholder="Admin Password" style="background:#000; border:1px solid var(--term-color); color:var(--term-color); padding:10px; width:70%; margin-right:10px;">
+                        <button onclick="adminLogin()" style="background:var(--term-color); color:#000; border:none; padding:10px 20px; cursor:pointer;">LOGIN</button>
+                    </div>
+                    <div id="admin-commands" style="display:none;">
+                        <button onclick="adminCommand('status')" style="background:var(--term-color); color:#000; border:none; padding:10px; cursor:pointer; margin:5px;">STATUS</button>
+                        <button onclick="adminCommand('reset')" style="background:var(--term-color); color:#000; border:none; padding:10px; cursor:pointer; margin:5px;">RESET</button>
+                        <button onclick="adminCommand('users')" style="background:var(--term-color); color:#000; border:none; padding:10px; cursor:pointer; margin:5px;">USERS</button>
+                    </div>
+                    <div id="admin-output" style="height:60%; background:#111; color:var(--term-color); border:1px solid var(--term-color); padding:10px; margin-top:10px; overflow-y:auto;"></div>
+                </div>
+
+                <!-- 4. VIDEO INTERFACE -->
+                <div id="video-interface" style="display:none; position:fixed; top:10%; left:10%; width:80%; height:80%; border: 2px solid var(--term-color); background:rgba(0,0,0,0.95); z-index:1000; padding:20px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                        <h3 style="color:var(--term-color);">📹 VIDEO CALL</h3>
+                        <button onclick="closePanel('video-interface')" style="background:var(--term-color); color:#000; border:none; padding:5px 10px; cursor:pointer;">✕</button>
+                    </div>
+                    <div style="display:flex; gap:10px; height:70%;">
+                        <video id="local-video" autoplay muted style="width:50%; background:#000; border:1px solid var(--term-color);"></video>
+                        <video id="remote-video" autoplay style="width:50%; background:#000; border:1px solid var(--term-color);"></video>
+                    </div>
+                    <div style="margin-top:10px; text-align:center;">
+                        <button onclick="startVideo()" style="background:var(--term-color); color:#000; border:none; padding:10px 20px; cursor:pointer; margin:5px;">📹 START</button>
+                        <button onclick="stopVideo()" style="background:var(--term-color); color:#000; border:none; padding:10px 20px; cursor:pointer; margin:5px;">⏹ STOP</button>
+                        <input type="text" id="call-user" placeholder="User to call" style="background:#000; border:1px solid var(--term-color); color:var(--term-color); padding:10px; margin:5px;">
+                        <button onclick="callUser()" style="background:var(--term-color); color:#000; border:none; padding:10px 20px; cursor:pointer; margin:5px;">📞 CALL</button>
+                    </div>
+                </div>
+
+                <!-- 5. TUNNEL MODAL -->
+                <div id="tunnel-modal" style="display:none; position:fixed; top:20%; left:20%; width:60%; height:60%; border: 2px solid var(--term-color); background:rgba(0,0,0,0.95); z-index:1000; padding:20px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                        <h3 style="color:var(--term-color);">🚇 TUNNEL CONNECTION</h3>
+                        <button onclick="closePanel('tunnel-modal')" style="background:var(--term-color); color:#000; border:none; padding:5px 10px; cursor:pointer;">✕</button>
+                    </div>
+                    <div id="tunnel-content" style="height:70%; background:#111; color:var(--term-color); border:1px solid var(--term-color); padding:10px; overflow-y:auto;"></div>
+                    <div style="margin-top:10px;">
+                        <input type="text" id="tunnel-input" placeholder="Send message through tunnel..." style="background:#000; border:1px solid var(--term-color); color:var(--term-color); padding:10px; width:70%; margin-right:10px;">
+                        <button onclick="sendTunnelMessage()" style="background:var(--term-color); color:#000; border:none; padding:10px 20px; cursor:pointer;">SEND</button>
+                    </div>
+                </div>
+
+                <!-- 6. PRIVATE CONTROLS -->
+                <div id="private-controls" style="position:fixed; top:10px; right:10px; z-index:500;">
+                    <button onclick="openPanel('admin-panel')" style="background:var(--term-color); color:#000; border:none; padding:5px 10px; cursor:pointer; margin:2px;">👑</button>
+                    <button onclick="openPanel('video-interface')" style="background:var(--term-color); color:#000; border:none; padding:5px 10px; cursor:pointer; margin:2px;">📹</button>
+                    <button onclick="openPanel('tunnel-modal')" style="background:var(--term-color); color:#000; border:none; padding:5px 10px; cursor:pointer; margin:2px;">🚇</button>
+                </div>
+            `;
+
+            // Initialize MQTT & Listeners
+            initMqtt(username);
         }
         // Text-to-Speech for AI responses
         function speakText(text) {
