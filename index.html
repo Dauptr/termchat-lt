@@ -1,327 +1,102 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TERMCHAT LT</title>
-    <style>
-        /* --- STYLES --- */
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            background-color: #111; color: #33ff00;
-            font-family: 'Courier New', Courier, monospace;
-            height: 100vh; display: flex; justify-content: center; align-items: center;
-            overflow: hidden;
-        }
-        #terminal {
-            width: 100%; max-width: 800px; height: 90vh;
-            background-color: #050505; border: 2px solid #33ff00;
-            padding: 20px; display: flex; flex-direction: column;
-            position: relative; box-shadow: 0 0 20px rgba(51, 255, 0, 0.2);
-        }
-        /* Scanline effect */
-        #terminal::before {
-            content: " "; display: block; position: absolute;
-            top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            z-index: 2; background-size: 100% 2px, 3px 100%; pointer-events: none;
-        }
-        /* CRT Flicker */
-        @keyframes flicker {
-            0% { opacity: 0.97; }
-            5% { opacity: 0.95; }
-            10% { opacity: 0.9; }
-            15% { opacity: 0.95; }
-            20% { opacity: 0.99; }
-            50% { opacity: 0.95; }
-            80% { opacity: 0.9; }
-            100% { opacity: 0.97; }
-        }
-        #terminal::after {
-            content: " "; display: block; position: absolute;
-            top: 0; left: 0; bottom: 0; right: 0;
-            background: rgba(18, 16, 16, 0.1);
-            opacity: 0;
-            z-index: 2;
-            pointer-events: none;
-            animation: flicker 0.15s infinite;
-        }
-
-        .header {
-            border-bottom: 1px solid #33ff00; padding-bottom: 10px; margin-bottom: 10px;
-            display: flex; justify-content: space-between; text-transform: uppercase; font-weight: bold; z-index: 3;
-        }
-        #output { flex-grow: 1; overflow-y: auto; margin-bottom: 10px; white-space: pre-wrap; z-index: 3; font-size: 1.1rem; padding-right: 5px; }
-        /* Custom Scrollbar */
-        #output::-webkit-scrollbar { width: 8px; }
-        #output::-webkit-scrollbar-track { background: #000; }
-        #output::-webkit-scrollbar-thumb { background: #33ff00; border: 1px solid #000; }
-
-        .input-line { display: flex; align-items: center; border-top: 1px solid #33ff00; padding-top: 10px; z-index: 3; }
-        .prompt { margin-right: 10px; font-weight: bold; animation: blink 1s step-end infinite; }
-        input[type="text"] {
-            background: transparent; border: none; color: #33ff00;
-            font-family: 'Courier New', Courier, monospace; font-size: 1.1rem; flex-grow: 1; outline: none;
-            text-transform: uppercase;
-        }
-        .hidden { display: none !important; }
-        .system-msg { color: #ffff00; font-style: italic; }
-        .user-msg { color: #ffffff; font-weight: bold; }
-        .other-msg { color: #33ff00; }
-        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 1; } }
-        
-        /* Status Colors */
-        .status-offline { color: red; }
-        .status-online { color: #33ff00; text-shadow: 0 0 5px #33ff00; }
-    </style>
-    <!-- Load Paho MQTT Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TERMCHAT LT</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* --- STYLES --- */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #111; color: #33ff00;
+      font-family: 'Courier New', Courier, monospace;
+      height: 100vh; display: flex; justify-content: center; align-items: center;
+      overflow: hidden;
+    }
+    #terminal {
+      width: 100%; max-width: 800px; height: 90vh;
+      background-color: #050505; border: 2px solid #33ff00;
+      padding: 20px; display: flex; flex-direction: column;
+      position: relative; box-shadow: 0 0 20px rgba(51, 255, 0, 0.2);
+    }
+    #terminal::before {
+      content: " "; display: block; position: absolute;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+      z-index: 2; background-size: 100% 2px, 3px 100%; pointer-events: none;
+    }
+    @keyframes flicker {
+      0% { opacity: 0.97; }
+      5% { opacity: 0.95; }
+      10% { opacity: 0.9; }
+      15% { opacity: 0.95; }
+      20% { opacity: 0.99; }
+      50% { opacity: 0.95; }
+      80% { opacity: 0.9; }
+      100% { opacity: 0.97; }
+    }
+    #terminal::after {
+      content: " "; display: block; position: absolute;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: rgba(18, 16, 16, 0.1);
+      opacity: 0;
+      z-index: 2;
+      pointer-events: none;
+      animation: flicker 0.15s infinite;
+    }
+    .header {
+      border-bottom: 1px solid #33ff00; padding-bottom: 10px; margin-bottom: 10px;
+      display: flex; justify-content: space-between; text-transform: uppercase; font-weight: bold; z-index: 3;
+    }
+    #output { flex-grow: 1; overflow-y: auto; margin-bottom: 10px; white-space: pre-wrap; z-index: 3; font-size: 1.1rem; padding-right: 5px; }
+    #output::-webkit-scrollbar { width: 8px; }
+    #output::-webkit-scrollbar-track { background: #000; }
+    #output::-webkit-scrollbar-thumb { background: #33ff00; border: 1px solid #000; }
+    .input-line { display: flex; align-items: center; border-top: 1px solid #33ff00; padding-top: 10px; z-index: 3; }
+    .prompt { margin-right: 10px; font-weight: bold; animation: blink 1s step-end infinite; }
+    input[type="text"] {
+      background: transparent; border: none; color: #33ff00;
+      font-family: 'Courier New', Courier, monospace; font-size: 1.1rem; flex-grow: 1; outline: none;
+      text-transform: uppercase;
+    }
+    .hidden { display: none !important; }
+    .system-msg { color: #ffff00; font-style: italic; }
+    .user-msg { color: #ffffff; font-weight: bold; }
+    .other-msg { color: #33ff00; }
+    @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 1; } }
+    .status-offline { color: red; }
+    .status-online { color: #33ff00; text-shadow: 0 0 5px #33ff00; }
+    .confirm-box {
+      background: #222; border: 1px solid #33ff00; color: #33ff00; padding: 10px; margin: 10px 0;
+      font-size: 1rem; border-radius: 4px;
+    }
+    .confirm-btn { background: #33ff00; color: #111; border: none; padding: 5px 10px; margin: 0 5px; cursor: pointer; border-radius: 2px; }
+    .confirm-btn:hover { background: #55ff33; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
 </head>
 <body>
-
-    <div id="terminal">
-        <div class="header">
-            <span id="status-text" class="status">🔊 OFFLINE</span>
-            <span>## TERMOS LT v1.0</span>
-        </div>
-
-        <div id="output">
-            <div id="intro-screen">
-                <p>INITIALIZING TERMOS...</p>
-                <p>LOADING MODULES... [OK]</p>
-                <p>CHECKING PERIPHERALS... [OK]</p>
-                <p>&nbsp;</p>
-                <p>PRESS [ENTER] TO ESTABLISH UPLINK</p>
-            </div>
-            <div id="chat-room" class="hidden"></div>
-        </div>
-
-        <div class="input-line">
-            <span class="prompt">&gt;</span>
-            <input type="text" id="command-input" autocomplete="off" autofocus>
-        </div>
+  <div id="terminal">
+    <div class="header">
+      <span id="status-text" class="status">🔊 OFFLINE</span>
+      <span>## TERMOS LT v1.0</span>
     </div>
-
-    <script>
-        /* --- CONFIGURATION --- */
-        const MQTT_HOST = "broker.hivemq.com";
-        const MQTT_PORT = 8000;
-        const MQTT_TOPIC = "termchat/lt/v1"; 
-
-        /* --- STATE VARIABLES --- */
-        let client;
-        let isConnected = false;
-        let nickname = "Anon" + Math.floor(Math.random() * 9999);
-        let inputMode = "INTRO"; 
-
-        /* --- DOM ELEMENTS --- */
-        const outputDiv = document.getElementById('output');
-        const inputField = document.getElementById('command-input');
-        const statusText = document.getElementById('status-text');
-        const introScreen = document.getElementById('intro-screen');
-        const chatRoom = document.getElementById('chat-room');
-
-        /* --- INITIALIZATION --- */
-        document.addEventListener('DOMContentLoaded', () => {
-            inputField.focus();
-        });
-
-        // Keep focus on input unless user specifically selects text
-        document.addEventListener('click', () => {
-            // Only focus if we aren't selecting text to copy/paste
-            if (window.getSelection().toString() === '') {
-                inputField.focus();
-            }
-        });
-
-        inputField.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                const text = inputField.value.trim();
-                inputField.value = ''; // Clear input immediately
-
-                if (inputMode === 'INTRO') {
-                    handleIntro();
-                } else if (inputMode === 'CHAT') {
-                    handleChatCommand(text);
-                }
-            }
-        });
-
-        /* --- LOGIC HANDLERS --- */
-
-        function handleIntro() {
-            introScreen.classList.add('hidden');
-            chatRoom.classList.remove('hidden');
-            inputMode = 'CHAT';
-            
-            logToTerminal("ESTABLISHING SECURE UPLINK...", "system");
-            
-            // Simulate handshake delay
-            setTimeout(() => {
-                logToTerminal("EXCHANGING KEYS...", "system");
-                setTimeout(() => {
-                    connectMQTT();
-                }, 500);
-            }, 500);
-        }
-
-        function connectMQTT() {
-            const clientId = "termchat-client-" + Math.random().toString(16).substr(2, 8);
-            client = new Paho.MQTT.Client(MQTT_HOST, MQTT_PORT, clientId);
-
-            client.onConnectionLost = onConnectionLost;
-            client.onMessageArrived = onMessageArrived;
-
-            const options = {
-                timeout: 5,
-                useSSL: false, 
-                onSuccess: onConnect,
-                onFailure: onFailure
-            };
-
-            logToTerminal(`CONNECTING TO ${MQTT_HOST}...`, "system");
-            client.connect(options);
-        }
-
-        function handleChatCommand(text) {
-            if (!isConnected) {
-                logToTerminal("CONNECTION LOST. CANNOT TRANSMIT.", "system");
-                return;
-            }
-
-            if (!text) return;
-
-            // Commands
-            if (text.startsWith('/')) {
-                processCommand(text);
-                return;
-            }
-
-            // Standard Message
-            const message = new Paho.MQTT.Message(JSON.stringify({
-                nick: nickname,
-                text: text,
-                timestamp: new Date().toLocaleTimeString()
-            }));
-            message.destinationName = MQTT_TOPIC;
-            
-            try {
-                client.send(message);
-                renderMessage(nickname, text, 'user-msg');
-            } catch (err) {
-                logToTerminal("TRANSMISSION ERROR: " + err.message, "system");
-            }
-        }
-
-        function processCommand(cmd) {
-            const parts = cmd.split(' ');
-            const command = parts[0].toLowerCase();
-
-            switch (command) {
-                case '/help':
-                    logToTerminal("AVAILABLE COMMANDS:", "system");
-                    logToTerminal("  /nick [name]  - Update codename", "system");
-                    logToTerminal("  /clear        - Clear screen", "system");
-                    logToTerminal("  /exit         - Disconnect", "system");
-                    break;
-                case '/nick':
-                    if (parts[1]) {
-                        const oldNick = nickname;
-                        nickname = parts[1];
-                        logToTerminal(`IDENTITY UPDATED: ${oldNick} -> ${nickname}`, "system");
-                    } else {
-                        logToTerminal("ERROR: NAME REQUIRED", "system");
-                    }
-                    break;
-                case '/clear':
-                    chatRoom.innerHTML = '';
-                    logToTerminal("TERMINAL CLEARED.", "system");
-                    break;
-                case '/exit':
-                    if(client && client.isConnected()) {
-                        client.disconnect();
-                    }
-                    location.reload(); // Simple reload to 'exit'
-                    break;
-                default:
-                    logToTerminal(`UNKNOWN COMMAND: ${command}`, "system");
-                    break;
-            }
-        }
-
-        /* --- MQTT CALLBACKS --- */
-
-        function onConnect() {
-            isConnected = true;
-            statusText.innerHTML = "🟢 ONLINE";
-            statusText.className = "status status-online";
-            client.subscribe(MQTT_TOPIC);
-            logToTerminal("UPLINK ESTABLISHED.", "system");
-            logToTerminal(`WELCOME, ${nickname}.`, "system");
-        }
-
-        function onFailure(responseObject) {
-            isConnected = false;
-            statusText.innerHTML = "🔴 ERR";
-            statusText.className = "status status-offline";
-            logToTerminal("CONN FAILED: " + responseObject.errorMessage, "system");
-            logToTerminal("RETRYING...", "system");
-            setTimeout(connectMQTT, 3000);
-        }
-
-        function onConnectionLost(responseObject) {
-            if (responseObject.errorCode !== 0) {
-                isConnected = false;
-                statusText.innerHTML = "🔴 OFFLINE";
-                statusText.className = "status status-offline";
-                logToTerminal("UPLINK SEVERED.", "system");
-            }
-        }
-
-        function onMessageArrived(message) {
-            try {
-                const payload = JSON.parse(message.payloadString);
-                
-                // Render if it has the expected structure
-                if (payload.nick && payload.text) {
-                    // Avoid echoing yourself if using a client that echos (HiveMQ usually doesn't)
-                    // But we check just in case
-                    if (payload.nick !== nickname) {
-                        renderMessage(payload.nick, payload.text, 'other-msg');
-                    }
-                }
-            } catch (e) {
-                // Fallback for non-JSON messages
-                logToTerminal(message.payloadString, 'other-msg');
-            }
-        }
-
-        /* --- UI HELPERS --- */
-
-        function logToTerminal(text, type) {
-            const line = document.createElement('div');
-            line.className = type;
-            const time = new Date().toLocaleTimeString([], { hour12: false });
-            line.textContent = `[${time}] ${text}`;
-            chatRoom.appendChild(line);
-            scrollToBottom();
-        }
-
-        function renderMessage(nick, text, cssClass) {
-            const line = document.createElement('div');
-            const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit' });
-            
-            // HTML construction for message
-            line.innerHTML = `<span style="opacity:0.6">[${time}]</span> <span style="font-weight:bold">&lt;${nick}&gt;</span> ${text}`;
-            line.className = cssClass;
-            
-            chatRoom.appendChild(line);
-            scrollToBottom();
-        }
-
-        function scrollToBottom() {
-            outputDiv.scrollTop = outputDiv.scrollHeight;
-        }
-    </script>
+    <div id="output">
+      <div id="intro-screen">
+        <p>INITIALIZING TERMOS...</p>
+        <p>LOADING MODULES... [OK]</p>
+        <p>CHECKING PERIPHERALS... [OK]</p>
+        <p>&nbsp;</p>
+        <p>PRESS [ENTER] TO ESTABLISH UPLINK</p>
+      </div>
+      <div id="chat-room" class="hidden"></div>
+    </div>
+    <div class="input-line">
+      <span class="prompt">></span>
+      <input type="text" id="command-input" autocomplete="off" autofocus>
+    </div>
+  </div>
+  <script src="script.js"></script>
 </body>
 </html>
