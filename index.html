@@ -5,163 +5,69 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TERMCHAT LT</title>
     <style>
-        /* --- BASIC RESET & LAYOUT --- */
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
+        /* --- STYLES (Same as before, kept for completeness) --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            background-color: #111;
-            color: #33ff00; /* Classic Terminal Green */
+            background-color: #111; color: #33ff00;
             font-family: 'Courier New', Courier, monospace;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
+            height: 100vh; display: flex; justify-content: center; align-items: center;
         }
-
-        /* --- TERMINAL CONTAINER --- */
         #terminal {
-            width: 100%;
-            max-width: 800px;
-            height: 90vh;
-            background-color: #000;
-            border: 2px solid #33ff00;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 0 20px rgba(51, 255, 0, 0.2);
+            width: 100%; max-width: 800px; height: 90vh;
+            background-color: #000; border: 2px solid #33ff00;
+            padding: 20px; display: flex; flex-direction: column;
             position: relative;
         }
-
-        /* --- CRT SCANLINE EFFECT --- */
-        #terminal::before {
-            content: " ";
-            display: block;
-            position: absolute;
-            top: 0;
-            left: 0;
-            bottom: 0;
-            right: 0;
+        #terminal::before { /* Scanline effect */
+            content: " "; display: block; position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
             background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            z-index: 2;
-            background-size: 100% 2px, 3px 100%;
-            pointer-events: none;
+            z-index: 2; background-size: 100% 2px, 3px 100%; pointer-events: none;
         }
-
-        /* --- HEADER --- */
         .header {
-            border-bottom: 1px solid #33ff00;
-            padding-bottom: 10px;
-            margin-bottom: 10px;
-            display: flex;
-            justify-content: space-between;
-            text-transform: uppercase;
-            font-weight: bold;
-            z-index: 3;
+            border-bottom: 1px solid #33ff00; padding-bottom: 10px; margin-bottom: 10px;
+            display: flex; justify-content: space-between; text-transform: uppercase; font-weight: bold; z-index: 3;
         }
-
-        .status {
-            animation: blink 2s infinite;
-        }
-
-        /* --- CHAT OUTPUT AREA --- */
-        #output {
-            flex-grow: 1;
-            overflow-y: auto;
-            margin-bottom: 10px;
-            white-space: pre-wrap; /* Preserves whitespace */
-            z-index: 3;
-            font-size: 1.1rem;
-        }
-
-        /* Scrollbar styling */
-        #output::-webkit-scrollbar {
-            width: 10px;
-        }
-        #output::-webkit-scrollbar-thumb {
-            background: #33ff00;
-        }
-        #output::-webkit-scrollbar-track {
-            background: #002200;
-        }
-
-        /* --- INPUT AREA --- */
-        .input-line {
-            display: flex;
-            align-items: center;
-            border-top: 1px solid #33ff00;
-            padding-top: 10px;
-            z-index: 3;
-        }
-
-        .prompt {
-            margin-right: 10px;
-            font-weight: bold;
-        }
-
+        #output { flex-grow: 1; overflow-y: auto; margin-bottom: 10px; white-space: pre-wrap; z-index: 3; font-size: 1.1rem; }
+        .input-line { display: flex; align-items: center; border-top: 1px solid #33ff00; padding-top: 10px; z-index: 3; }
+        .prompt { margin-right: 10px; font-weight: bold; }
         input[type="text"] {
-            background: transparent;
-            border: none;
-            color: #33ff00;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 1.1rem;
-            flex-grow: 1;
-            outline: none;
-            caret-color: #33ff00; /* Blinking cursor color */
+            background: transparent; border: none; color: #33ff00;
+            font-family: 'Courier New', Courier, monospace; font-size: 1.1rem; flex-grow: 1; outline: none;
         }
-
-        /* --- UTILITIES --- */
-        .hidden {
-            display: none !important;
-        }
-
-        .system-msg { color: #ffff00; } /* Yellow for system text */
-        .user-msg { color: #ffffff; }   /* White for user */
-        .other-msg { color: #33ff00; }  /* Green for others */
-
-        @keyframes blink {
-            0% { opacity: 1; }
-            50% { opacity: 0; }
-            100% { opacity: 1; }
-        }
+        .hidden { display: none !important; }
+        .system-msg { color: #ffff00; }
+        .user-msg { color: #ffffff; }
+        .other-msg { color: #33ff00; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 1; } }
     </style>
+    <!-- Load Paho MQTT Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
 </head>
 <body>
 
     <div id="terminal">
-        <!-- Header Section -->
         <div class="header">
-            <span id="status-text" class="status">🔊 Speaking...</span>
+            <span id="status-text" class="status">🔊 OFFLINE</span>
             <span>## TERMOS LT</span>
         </div>
 
-        <!-- Chat Output Section -->
         <div id="output">
             <div id="intro-screen">
-                <p>INITIALIZING SYSTEM...</p>
-                <p>CONNECTION SECURE.</p>
+                <p>INITIALIZING TERMOS...</p>
+                <p>LOADING MODULES...</p>
                 <p>&nbsp;</p>
-                <p>PRESS [ENTER] TO JOIN LIVING ROOM</p>
+                <p>PRESS [ENTER] TO ESTABLISH UPLINK</p>
             </div>
-            
-            <div id="chat-room" class="hidden">
-                <p class="system-msg">-- JOINED TERMCHAT LT - LIVING ROOM --</p>
-                <p class="system-msg">Type a message and press Enter.</p>
-            </div>
+            <div id="chat-room" class="hidden"></div>
         </div>
 
-        <!-- Input Section -->
         <div class="input-line">
             <span class="prompt">&gt;</span>
             <input type="text" id="command-input" autocomplete="off" autofocus>
         </div>
     </div>
 
-    <!-- We use defer to ensure HTML loads before JS runs -->
-    <script src="script.js" defer></script>
+    <script src="script.js"></script>
 </body>
 </html>
